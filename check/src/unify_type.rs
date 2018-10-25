@@ -155,10 +155,12 @@ where
                 .iter()
                 .map(|missing_field| {
                     ::strsim::jaro_winkler(missing_field.as_ref(), field_in_type.as_ref())
-                }).max_by(|l, r| l.partial_cmp(&r).unwrap())
+                })
+                .max_by(|l, r| l.partial_cmp(&r).unwrap())
                 .expect("At least one missing field");
             (field_in_type, (similarity * 1000000.) as i32)
-        }).collect::<Vec<_>>();
+        })
+        .collect::<Vec<_>>();
     field_similarity.sort_by_key(|t| ::std::cmp::Reverse(t.1));
 
     Box::new(move |field: &I| {
@@ -366,7 +368,8 @@ where
                 &l_args,
                 r,
                 r_args,
-            ).map_err(|_| UnifyError::TypeMismatch(expected.clone(), actual.clone()))
+            )
+            .map_err(|_| UnifyError::TypeMismatch(expected.clone(), actual.clone()))
         }
         (
             &Type::App(ref l, ref l_args),
@@ -379,43 +382,25 @@ where
                 l_args,
                 &Type::builtin(BuiltinType::Function),
                 &r_args,
-            ).map_err(|_| UnifyError::TypeMismatch(expected.clone(), actual.clone()))
+            )
+            .map_err(|_| UnifyError::TypeMismatch(expected.clone(), actual.clone()))
         }
         (&Type::App(ref l, ref l_args), &Type::App(ref r, ref r_args)) => {
             unify_app(unifier, l, l_args, r, r_args)
                 .map_err(|_| UnifyError::TypeMismatch(expected.clone(), actual.clone()))
         }
-        (&Type::Variant(ref l_row), &Type::Variant(ref r_row)) => match (&**l_row, &**r_row) {
-            (
-                &Type::ExtendRow {
-                    fields: ref l_row,
-                    rest: ref l_rest,
-                    ..
-                },
-                &Type::ExtendRow {
-                    fields: ref r_row,
-                    rest: ref r_rest,
-                    ..
-                },
-            ) => if l_row.len() == r_row.len()
-                && l_row
-                    .iter()
-                    .zip(r_row)
-                    .all(|(l, r)| l.name.name_eq(&r.name))
-                && l_rest == r_rest
-            {
-                let iter = l_row.iter().zip(r_row);
-                let new_fields = merge::merge_tuple_iter(iter, |l, r| {
-                    unifier
-                        .try_match(&l.typ, &r.typ)
-                        .map(|typ| Field::new(l.name.clone(), typ))
-                });
-                Ok(new_fields.map(|fields| Type::poly_variant(fields, l_rest.clone())))
-            } else {
-                Err(UnifyError::TypeMismatch(expected.clone(), actual.clone()))
-            },
-            _ => Err(UnifyError::TypeMismatch(expected.clone(), actual.clone())),
-        },
+        (&Type::Variant(ref l_row), &Type::Variant(ref r_row)) => {
+            // Store the current variants so that they can be used when displaying field errors
+            let previous = mem::replace(
+                &mut unifier.state.record_context,
+                Some((expected.clone(), actual.clone())),
+            );
+            let result = unifier
+                .try_match(l_row, r_row)
+                .map(|row| ArcType::from(Type::Variant(row)));
+            unifier.state.record_context = previous;
+            Ok(result)
+        }
         (&Type::Record(ref l_row), &Type::Record(ref r_row)) => {
             // Store the current records so that they can be used when displaying field errors
             let previous = mem::replace(
@@ -887,6 +872,12 @@ where
     Ok(Some(Type::extend_row(types, fields, rest)))
 }
 
+enum FoundAlias {
+    Root(ArcType),
+    Found(ArcType),
+    AlreadyEqual,
+}
+
 /// Attempt to unify two alias types.
 /// To find a possible successful unification we walk through the alias expansions of `l` in an
 /// attempt to find that `l` expands to the alias `r_id`
@@ -894,19 +885,14 @@ fn find_alias<'a, U>(
     unifier: &mut UnifierState<'a, U>,
     l: ArcType,
     r_id: &SymbolRef,
-) -> Result<Option<ArcType>, ()>
+) -> Result<FoundAlias, ()>
 where
     UnifierState<'a, U>: Unifier<State<'a>, ArcType>,
 {
     let reduced_aliases = unifier.state.reduced_aliases.len();
     let result = find_alias_(unifier, l, r_id);
-    match result {
-        Ok(Some(_)) => (),
-        _ => {
-            // Remove any alias reductions that were added if no new type is returned
-            unifier.state.reduced_aliases.truncate(reduced_aliases);
-        }
-    }
+    // Remove any alias reductions that were added if no new type is returned
+    unifier.state.reduced_aliases.truncate(reduced_aliases);
     result
 }
 
@@ -914,7 +900,7 @@ fn find_alias_<'a, U>(
     unifier: &mut UnifierState<'a, U>,
     mut l: ArcType,
     r_id: &SymbolRef,
-) -> Result<Option<ArcType>, ()>
+) -> Result<FoundAlias, ()>
 where
     UnifierState<'a, U>: Unifier<State<'a>, ArcType>,
 {
@@ -955,7 +941,11 @@ where
                 if l_id == r_id {
                     // If the aliases matched before going through an alias there is no need to
                     // return a replacement type
-                    return Ok(if did_alias { Some(l.clone()) } else { None });
+                    return Ok(if did_alias {
+                        FoundAlias::Found(l.clone())
+                    } else {
+                        FoundAlias::AlreadyEqual
+                    });
                 }
                 did_alias = true;
                 match resolve::remove_alias(unifier.state.env, &l) {
@@ -976,7 +966,7 @@ where
             None => break,
         }
     }
-    Ok(None)
+    Ok(FoundAlias::Root(l))
 }
 
 /// Attempt to find a common alias between two types. If the function is successful it returns
@@ -1001,10 +991,15 @@ where
     UnifierState<'a, U>: Unifier<State<'a>, ArcType>,
 {
     let mut l = expected.clone();
+    let mut l_root = None;
     if let Some(r_id) = actual.name() {
         l = match find_alias(unifier, l.clone(), r_id)? {
-            None => l,
-            Some(typ) => {
+            FoundAlias::Root(root) => {
+                l_root = Some(root);
+                l
+            }
+            FoundAlias::AlreadyEqual => l,
+            FoundAlias::Found(typ) => {
                 *through_alias = true;
                 return Ok((typ, actual.clone()));
             }
@@ -1013,8 +1008,14 @@ where
     let mut r = actual.clone();
     if let Some(l_id) = expected.name() {
         r = match find_alias(unifier, r.clone(), l_id)? {
-            None => r,
-            Some(typ) => {
+            FoundAlias::Root(root) => {
+                if let Some(l_root) = l_root {
+                    l = l_root;
+                }
+                root
+            }
+            FoundAlias::AlreadyEqual => r,
+            FoundAlias::Found(typ) => {
                 *through_alias = true;
                 typ
             }

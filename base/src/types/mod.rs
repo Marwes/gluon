@@ -116,7 +116,8 @@ where
             .map(|(i, typ)| Field {
                 name: symbols.from_str(&format!("_{}", i)),
                 typ,
-            }).collect();
+            })
+            .collect();
         if fields.is_empty() {
             self.unit()
         } else {
@@ -125,7 +126,11 @@ where
     }
 
     pub fn variant(&self, fields: Vec<Field<Id, T>>) -> T {
-        Type::poly_variant(fields, self.empty_row())
+        self.poly_variant(fields, self.empty_row())
+    }
+
+    pub fn poly_variant(&self, fields: Vec<Field<Id, T>>, rest: T) -> T {
+        Type::poly_variant(fields, rest)
     }
 
     pub fn record(&self, types: Vec<Field<Id, Alias<Id, T>>>, fields: Vec<Field<Id, T>>) -> T {
@@ -234,12 +239,10 @@ pub struct TypeVariable {
 )]
 #[cfg_attr(
     feature = "serde_derive",
-    serde(
-        bound(
-            deserialize = "
+    serde(bound(
+        deserialize = "
            Id: DeserializeState<'de, Seed<Id, T>> + Clone + ::std::any::Any"
-        )
-    )
+    ))
 )]
 #[cfg_attr(feature = "serde_derive", serde(de_parameters = "T"))]
 #[cfg_attr(feature = "serde_derive", serde(serialize_state = "SeSeed"))]
@@ -266,12 +269,10 @@ pub struct Skolem<Id> {
 )]
 #[cfg_attr(
     feature = "serde_derive",
-    serde(
-        bound(
-            deserialize = "
+    serde(bound(
+        deserialize = "
            Id: DeserializeState<'de, Seed<Id, T>> + Clone + ::std::any::Any"
-        )
-    )
+    ))
 )]
 #[cfg_attr(feature = "serde_derive", serde(de_parameters = "T"))]
 #[cfg_attr(feature = "serde_derive", serde(serialize_state = "SeSeed"))]
@@ -305,13 +306,11 @@ impl<Id> Generic<Id> {
 )]
 #[cfg_attr(
     feature = "serde_derive",
-    serde(
-        bound(
-            deserialize = "
+    serde(bound(
+        deserialize = "
            T: DeserializeState<'de, Seed<Id, T>> + Clone + From<Type<Id, T>> + ::std::any::Any,
            Id: DeserializeState<'de, Seed<Id, T>> + Clone + ::std::any::Any"
-        )
-    )
+    ))
 )]
 #[cfg_attr(feature = "serde_derive", serde(serialize_state = "SeSeed"))]
 #[cfg_attr(
@@ -389,7 +388,8 @@ where
                     group: group.clone(),
                 })),
                 _marker: PhantomData,
-            }).collect()
+            })
+            .collect()
     }
 
     pub fn as_type(&self) -> &T {
@@ -440,13 +440,11 @@ where
 )]
 #[cfg_attr(
     feature = "serde_derive",
-    serde(
-        bound(
-            deserialize = "
+    serde(bound(
+        deserialize = "
            T: DeserializeState<'de, Seed<Id, T>> + Clone + From<Type<Id, T>> + ::std::any::Any,
            Id: DeserializeState<'de, Seed<Id, T>> + Clone + ::std::any::Any"
-        )
-    )
+    ))
 )]
 #[cfg_attr(feature = "serde_derive", serde(serialize_state = "SeSeed"))]
 #[cfg_attr(
@@ -526,13 +524,11 @@ where
 )]
 #[cfg_attr(
     feature = "serde_derive",
-    serde(
-        bound(
-            deserialize = "
+    serde(bound(
+        deserialize = "
            T: Clone + From<Type<Id, T>> + ::std::any::Any + DeserializeState<'de, Seed<Id, T>>,
            Id: DeserializeState<'de, Seed<Id, T>> + Clone + ::std::any::Any"
-        )
-    )
+    ))
 )]
 #[cfg_attr(feature = "serde_derive", serde(serialize_state = "SeSeed"))]
 #[cfg_attr(
@@ -620,14 +616,12 @@ impl<Id, T> Deref for AliasRef<Id, T> {
 #[cfg_attr(feature = "serde_derive", serde(de_parameters = "U"))]
 #[cfg_attr(
     feature = "serde_derive",
-    serde(
-        bound(
-            deserialize = "
+    serde(bound(
+        deserialize = "
            Id: DeserializeState<'de, Seed<Id, U>> + Clone + ::std::any::Any,
            T: DeserializeState<'de, Seed<Id, U>>
                              "
-        )
-    )
+    ))
 )]
 #[cfg_attr(feature = "serde_derive", serde(serialize_state = "SeSeed"))]
 #[cfg_attr(
@@ -650,6 +644,18 @@ pub type AppVec<T> = SmallVec<[T; 2]>;
 impl<Id, T> Field<Id, T> {
     pub fn new(name: Id, typ: T) -> Field<Id, T> {
         Field { name, typ }
+    }
+
+    pub fn ctor<S, I>(symbols: &mut S, name: Id, elems: I) -> Self
+    where
+        S: ?Sized + IdentEnv<Ident = Id>,
+        I: IntoIterator<Item = T>,
+        T: From<Type<Id, T>>,
+    {
+        Field {
+            name,
+            typ: Type::tuple(symbols, elems),
+        }
     }
 }
 
@@ -677,9 +683,8 @@ pub enum ArgType {
 )]
 #[cfg_attr(
     feature = "serde_derive",
-    serde(
-        bound(
-            deserialize = "
+    serde(bound(
+        deserialize = "
            T: Clone
                 + From<Type<Id, T>>
                 + ::std::any::Any
@@ -688,8 +693,7 @@ pub enum ArgType {
                 + Clone
                 + ::std::any::Any
                 + DeserializeState<'de, Seed<Id, T>>"
-        )
-    )
+    ))
 )]
 #[cfg_attr(feature = "serde_derive", serde(serialize_state = "SeSeed"))]
 pub enum Type<Id, T = ArcType<Id>> {
@@ -847,7 +851,8 @@ where
                 .map(|(i, typ)| Field {
                     name: symbols.from_str(&format!("_{}", i)),
                     typ,
-                }).collect(),
+                })
+                .collect(),
             Type::empty_row(),
         ))
     }
@@ -966,17 +971,19 @@ where
     pub fn as_function_with_type(&self) -> Option<(ArgType, &T, &T)> {
         match *self {
             Type::Function(arg_type, ref arg, ref ret) => return Some((arg_type, arg, ret)),
-            Type::App(ref app, ref args) => if args.len() == 2 {
-                if let Type::Builtin(BuiltinType::Function) = **app {
-                    return Some((ArgType::Explicit, &args[0], &args[1]));
-                }
-            } else if args.len() == 1 {
-                if let Type::App(ref app, ref args2) = **app {
+            Type::App(ref app, ref args) => {
+                if args.len() == 2 {
                     if let Type::Builtin(BuiltinType::Function) = **app {
-                        return Some((ArgType::Explicit, &args2[0], &args[0]));
+                        return Some((ArgType::Explicit, &args[0], &args[1]));
+                    }
+                } else if args.len() == 1 {
+                    if let Type::App(ref app, ref args2) = **app {
+                        if let Type::Builtin(BuiltinType::Function) = **app {
+                            return Some((ArgType::Explicit, &args2[0], &args[0]));
+                        }
                     }
                 }
-            },
+            }
             _ => (),
         }
         None
@@ -1441,7 +1448,8 @@ impl ArcType {
             .take_while(|&(l, r)| match **l {
                 Type::Generic(ref g) => g == r,
                 _ => false,
-            }).count();
+            })
+            .count();
 
         let typ = if params.len() <= allowed_missing_args + args.len() {
             // Remove the args at the end of the aliased type
@@ -1938,30 +1946,57 @@ where
             Type::Variant(ref row) => {
                 let mut first = true;
 
-                let doc = match **row {
-                    Type::EmptyRow => arena.nil(),
-                    Type::ExtendRow { ref fields, .. } => {
-                        arena.concat(fields.iter().map(|field| {
-                            chain![arena;
-                                if first {
-                                    first = false;
-                                    arena.nil()
-                                } else {
-                                    arena.newline()
-                                },
+                let mut doc = arena.nil();
+                let mut row = row;
+                loop {
+                    row = match **row {
+                        Type::EmptyRow => break,
+                        Type::ExtendRow {
+                            ref fields,
+                            ref rest,
+                            ..
+                        } => {
+                            doc = doc.append(arena.concat(fields.iter().map(|field| {
+                                chain![arena;
+                                    if first {
+                                        first = false;
+                                        arena.nil()
+                                    } else {
+                                        arena.space()
+                                    },
+                                    "| ",
+                                    field.name.as_ref(),
+                                    if field.typ.as_function().is_some() {
+                                        arena.concat(arg_iter(&field.typ).map(|arg| {
+                                            chain![arena;
+                                                " ",
+                                                dt(Prec::Constructor, arg).pretty(printer)
+                                            ]
+                                        }))
+                                    } else {
+                                        arena.concat(row_iter(&field.typ).map(|field| {
+                                            chain![arena;
+                                                " ",
+                                                dt(Prec::Constructor, &field.typ).pretty(printer)
+                                            ]
+                                        }))
+                                    }
+                                ]
+                                .group()
+                            })));
+                            rest
+                        }
+                        _ => {
+                            doc = chain![arena;
+                                doc,
+                                arena.space(),
                                 "| ",
-                                field.name.as_ref(),
-                                arena.concat(arg_iter(&field.typ).map(|arg| {
-                                    chain![arena;
-                                        " ",
-                                        dt(Prec::Constructor, arg).pretty(printer)
-                                    ]
-                                }))
-                            ].group()
-                        }))
-                    }
-                    _ => ice!("Unexpected type in variant"),
-                };
+                                top(row).pretty(printer)
+                            ];
+                            break;
+                        }
+                    };
+                }
 
                 p.enclose(Prec::Constructor, arena, doc).group()
             }
@@ -2106,7 +2141,8 @@ where
                     } else {
                         arena.nil()
                     }
-                ].group();
+                ]
+                .group();
                 doc = doc.append(newline.clone()).append(f);
             }
             typ = rest;
@@ -2147,7 +2183,8 @@ where
                     } else {
                         arena.nil()
                     }
-                ].group();
+                ]
+                .group();
                 let space_before = if i == 0 && open == "(" {
                     arena.nil()
                 } else {
@@ -2591,13 +2628,15 @@ where
                 .map(|field| Field {
                     name: field.name.clone(),
                     typ: Alias::from(translate_alias(&field.typ, &mut translate)),
-                }).collect(),
+                })
+                .collect(),
             fields
                 .iter()
                 .map(|field| Field {
                     name: field.name.clone(),
                     typ: translate(&field.typ),
-                }).collect(),
+                })
+                .collect(),
             translate(rest),
         ),
         Type::Hole => cache.hole(),
