@@ -428,7 +428,8 @@ impl CompilerEnv for TypeInfos {
                     .enumerate()
                     .find(|&(_, field)| field.name == *id),
                 _ => None,
-            }).next()
+            })
+            .next()
             .map(|(tag, field)| {
                 (
                     Variable::Constructor(tag as VmTag, count_function_args(&field.typ)),
@@ -507,13 +508,15 @@ impl<'a> Compiler<'a> {
                     .enumerate()
                     .find(|&(_, field)| field.name == *id),
                 _ => None,
-            }).next()
+            })
+            .next()
             .map(|(tag, field)| {
                 Constructor(
                     tag as VmIndex,
-                    types::arg_iter(&field.typ).count() as VmIndex,
+                    types::row_iter(&field.typ).count() as VmIndex,
                 )
-            }).or_else(|| {
+            })
+            .or_else(|| {
                 current
                     .stack
                     .get(id)
@@ -527,9 +530,11 @@ impl<'a> Compiler<'a> {
                                 env.stack
                                     .get(id)
                                     .map(|&(_, ref typ)| UpVar(current[0].upvar(id, typ)))
-                            }).next()
+                            })
+                            .next()
                     })
-            }).or_else(|| {
+            })
+            .or_else(|| {
                 self.globals
                     .find_var(&id)
                     .map(|(variable, typ)| match variable {
@@ -564,7 +569,7 @@ impl<'a> Compiler<'a> {
             Type::Variant(ref row) => row
                 .row_iter()
                 .enumerate()
-                .find(|&(_, field)| field.name == *constructor)
+                .find(|&(_, field)| field.name.name_eq(constructor))
                 .map(|(tag, _)| tag as VmTag),
             _ => None,
         }
@@ -797,7 +802,6 @@ impl<'a> Compiler<'a> {
                             let tag =
                                 self.find_tag(typ.remove_forall(), &id.name)
                                     .unwrap_or_else(|| {
-                                        eprintln!("{}", expr);
                                         ice!(
                                             "ICE: Could not find tag for {}::{} when matching on \
                                              expression",
@@ -917,8 +921,10 @@ impl<'a> Compiler<'a> {
                         function.emit(ConstructVariant {
                             tag: variants
                                 .row_iter()
-                                .position(|field| field.name == id.name)
-                                .unwrap() as VmTag,
+                                .position(|field| field.name.name_eq(&id.name))
+                                .unwrap_or_else(|| {
+                                    ice!("Variant `{}` not found in {}", id.name, variants)
+                                }) as VmTag,
                             args: exprs.len() as u32,
                         });
                     }

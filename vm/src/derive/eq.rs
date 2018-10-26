@@ -3,7 +3,7 @@ use base::ast::{
 };
 use base::pos;
 use base::symbol::{Symbol, Symbols};
-use base::types::{arg_iter, remove_forall, row_iter, Type};
+use base::types::{remove_forall, row_iter, Type};
 
 use macros::Error;
 
@@ -50,7 +50,8 @@ pub fn generate(
                     Some(acc) => infix(span, acc, symbols.symbol("&&"), eq_check),
                     None => eq_check,
                 })
-            }).unwrap_or_else(|| ident(span, symbols.symbol("True")))
+            })
+            .unwrap_or_else(|| ident(span, symbols.symbol("True")))
         };
 
     let comparison_expr = match **remove_forall(bind.alias.value.unresolved_type()) {
@@ -62,14 +63,15 @@ pub fn generate(
 
             let alts = row_iter(variants)
                 .map(|variant| {
-                    let l_pattern_args: Vec<_> = arg_iter(&variant.typ)
-                        .map(|typ| {
+                    let l_pattern_args: Vec<_> = row_iter(&variant.typ)
+                        .map(|field| {
                             (
-                                is_self_type(&bind.alias.value.name, typ),
+                                is_self_type(&bind.alias.value.name, &field.typ),
                                 TypedIdent::new(Symbol::from("arg_l")),
                             )
-                        }).collect();
-                    let r_pattern_args: Vec<_> = arg_iter(&variant.typ)
+                        })
+                        .collect();
+                    let r_pattern_args: Vec<_> = row_iter(&variant.typ)
                         .map(|_| TypedIdent::new(Symbol::from("arg_r")))
                         .collect();
 
@@ -103,7 +105,8 @@ pub fn generate(
                         ),
                         expr,
                     }
-                }).chain(Some(catch_all_alternative))
+                })
+                .chain(Some(catch_all_alternative))
                 .collect();
             Expr::Match(matcher, alts)
         }
@@ -114,11 +117,13 @@ pub fn generate(
                         is_self_type(&bind.alias.value.name, &field.typ),
                         TypedIdent::new(Symbol::from(format!("{}_l", field.name.declared_name()))),
                     )
-                }).collect();
+                })
+                .collect();
             let r_symbols: Vec<_> = row_iter(row)
                 .map(|field| {
                     TypedIdent::new(Symbol::from(format!("{}_r", field.name.declared_name())))
-                }).collect();
+                })
+                .collect();
 
             let expr = generate_and_chain(symbols, &mut l_symbols.iter().zip(&r_symbols));
             let generate_record_pattern = |symbols| {
@@ -133,7 +138,8 @@ pub fn generate(
                             .map(|(field, bind)| PatternField {
                                 name: pos::spanned(span, field.name.clone()),
                                 value: Some(pos::spanned(span, Pattern::Ident(bind))),
-                            }).collect(),
+                            })
+                            .collect(),
                     },
                 )
             };
