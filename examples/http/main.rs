@@ -41,6 +41,9 @@ fn main() {
 }
 
 fn start(thread: &Thread, port: u16) -> impl Future<Item = (), Error = failure::Error> {
+    Compiler::new()
+        .load_file(thread, "std/http/types.glu")
+        .unwrap_or_else(|err| panic!("{}", err));
     let thread = thread.root_thread();
     future::lazy(|| -> Result<_, failure::Error> {
         // Last we run our `http_server.glu` module which returns a function which starts listening
