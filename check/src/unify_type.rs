@@ -1212,6 +1212,7 @@ pub fn subsumes(
             variables: variables,
             errors: Errors::new(),
             level: level,
+            in_arg: false,
         },
     };
 
@@ -1228,6 +1229,7 @@ struct Subsume<'e> {
     variables: &'e mut ScopedMap<Symbol, ArcType>,
     errors: Errors<Error<Symbol>>,
     level: u32,
+    in_arg: bool,
 }
 
 impl<'a, 'e> Unifier<State<'a>, ArcType> for UnifierState<'a, Subsume<'e>> {
@@ -1306,16 +1308,22 @@ impl<'a, 'e> Unifier<State<'a>, ArcType> for UnifierState<'a, Subsume<'e>> {
                 let (l_arg, l_ret) = l.as_function().unwrap();
                 // FIXME Don't use ?
                 let (r_arg, r_ret) = unify_function(self, &r)?;
-                self.try_match_res(l_arg, &r_arg)?;
+                self.unifier.in_arg = true;
+                self.try_match(l_arg, &r_arg);
+                self.unifier.in_arg = false;
                 self.try_match_res(l_ret, &r_ret)
             }
 
             (_, &Type::Forall(ref params, ref r, _)) => {
-                let mut variables = params
-                    .iter()
-                    .map(|param| (param.id.clone(), subs.new_var()))
-                    .collect();
-                let r = r.instantiate_generics(&mut variables);
+                let r = if self.unifier.in_arg {
+                    r.skolemize(&mut FnvMap::default())
+                } else {
+                    let mut variables = params
+                        .iter()
+                        .map(|param| (param.id.clone(), subs.new_var()))
+                        .collect();
+                    r.instantiate_generics(&mut variables)
+                };
                 self.try_match_res(l, &r)
             }
 
