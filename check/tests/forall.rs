@@ -17,6 +17,8 @@ use base::types::{Field, Type};
 
 use support::{alias, intern, typ, MockEnv};
 
+use check::typecheck::TypeError;
+
 #[macro_use]
 
 mod support;
@@ -1266,4 +1268,18 @@ test_check! {
     ()
     "#,
     "()"
+}
+
+test_check_err! {
+    escaping_skolem_in_argument,
+    r#"
+    type ST s a = { st : (a -> s -> s) }
+    type Test s = | Test
+    let any x = any x
+    let run x : (forall s . ST s a) -> a = any ()
+    let new : ST s (Test s) = any ()
+    run new
+    "#,
+    TypeError::Message(_),
+    TypeError::Message(_)
 }
