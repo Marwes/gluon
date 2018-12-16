@@ -612,7 +612,7 @@ impl<'a> Typecheck<'a> {
         for err in errors {
             use self::TypeError::*;
 
-            match err.value.error {
+            match &mut err.value.error {
                 UndefinedVariable(_)
                 | UndefinedType(_)
                 | DuplicateTypeDefinition(_)
@@ -622,18 +622,18 @@ impl<'a> Typecheck<'a> {
                 | KindError(_)
                 | RecursionCheck(_)
                 | Message(_) => (),
-                NotAFunction(ref mut typ)
-                | UndefinedField(ref mut typ, _)
-                | PatternError(ref mut typ, _)
-                | InvalidProjection(ref mut typ) => self.generalize_type(0, typ),
-                UnableToResolveImplicit(ref mut err) => {
+                NotAFunction(typ)
+                | UndefinedField(typ, _)
+                | PatternError(typ, _)
+                | InvalidProjection(typ) => self.generalize_type(0, typ),
+                UnableToResolveImplicit(err) => {
                     use implicits::ErrorKind::*;
-                    match err.kind {
-                        MissingImplicit(ref mut typ) => {
+                    match &mut err.kind {
+                        MissingImplicit(typ) => {
                             self.generalize_type(0, typ);
                         }
-                        AmbiguousImplicit(ref mut xs) => {
-                            for &mut (_, ref mut typ) in xs {
+                        AmbiguousImplicit(xs) => {
+                            for (_, typ) in xs {
                                 self.generalize_type(0, typ);
                             }
                         }
@@ -649,22 +649,26 @@ impl<'a> Typecheck<'a> {
                         })
                         .collect();
                 }
-                Unification(ref mut expected, ref mut actual, ref mut errors) => {
+                Unification(expected, actual, errors) => {
                     self.generalize_type_without_forall(0, expected);
                     self.generalize_type_without_forall(0, actual);
                     for err in errors {
-                        match *err {
-                            unify::Error::TypeMismatch(ref mut l, ref mut r) => {
+                        match err {
+                            unify::Error::TypeMismatch(l, r) => {
                                 self.generalize_type_without_forall(0, l);
                                 self.generalize_type_without_forall(0, r);
                             }
-                            unify::Error::Substitution(ref mut err) => match *err {
-                                substitution::Error::Occurs(_, ref mut typ) => {
+                            unify::Error::Substitution(err) => match err {
+                                substitution::Error::Occurs(_, typ) => {
                                     self.generalize_type_without_forall(0, typ);
                                 }
+                                substitution::Error::EscapingSkolem { skolem, variable } => {
+                                    self.generalize_type_without_forall(0, skolem);
+                                    self.generalize_type_without_forall(0, variable);
+                                }
                             },
-                            unify::Error::Other(ref mut err) => {
-                                if let unify_type::TypeError::MissingFields(ref mut typ, _) = *err {
+                            unify::Error::Other(err) => {
+                                if let unify_type::TypeError::MissingFields(typ, _) = err {
                                     self.generalize_type_without_forall(0, typ);
                                 }
                             }
@@ -1887,7 +1891,7 @@ impl<'a> Typecheck<'a> {
                     bind.resolved_type = typ;
                 }
 
-                let typ = self.new_skolem_scope_signature(&bind.resolved_type);
+                let typ = self.new_skolem_scope_signature(level, &bind.resolved_type);
                 self.typecheck_lambda(typ, bind.name.span.end(), &mut bind.args, &mut bind.expr)
             } else {
                 let typ = match bind.name.value {
@@ -1901,7 +1905,7 @@ impl<'a> Typecheck<'a> {
                     _ => self.type_cache.error(),
                 };
 
-                let typ = self.new_skolem_scope_signature(&typ);
+                let typ = self.new_skolem_scope_signature(level, &typ);
                 let function_type = self.skolemize(&typ);
 
                 self.typecheck_lambda(
@@ -2311,18 +2315,16 @@ impl<'a> Typecheck<'a> {
                     .find_type_info(id)
                     .map(|alias| alias.clone().into_type())
             }
-            Type::Variant(ref row) => {
-                let replacement = types::visit_type_opt(
-                    row,
-                    &mut types::ControlVisitation(|typ: &ArcType| {
-                        self.create_unifiable_signature_(typ)
-                    }),
-                );
-                replacement
-                    .clone()
-                    .map(|row| ArcType::from(Type::Variant(row)))
-            }
+
             Type::Hole => Some(self.subs.new_var()),
+
+            Type::Variant(ref row) => types::visit_type_opt(
+                row,
+                &mut types::ControlVisitation(|typ: &ArcType| {
+                    self.create_unifiable_signature_(typ)
+                }),
+            )
+            .map(|row| ArcType::from(Type::Variant(row))),
 
             Type::ExtendRow {
                 ref types,
@@ -2353,6 +2355,7 @@ impl<'a> Typecheck<'a> {
                     Type::extend_row,
                 )
             }
+
             Type::Forall(ref params, ref typ, _) => {
                 for param in params {
                     self.type_variables.insert(param.id.clone(), typ.clone());
@@ -2365,6 +2368,7 @@ impl<'a> Typecheck<'a> {
                 }
                 result.map(|typ| Type::forall(params.clone(), typ))
             }
+
             Type::Generic(ref generic) => {
                 if let Some(typ) = self.type_variables.get(&generic.id) {
                     match **typ {
@@ -2391,6 +2395,7 @@ impl<'a> Typecheck<'a> {
                     }
                 }
             }
+
             _ => types::walk_move_type_opt(
                 typ,
                 &mut types::ControlVisitation(|typ: &ArcType| {
@@ -3176,10 +3181,8 @@ impl<'a, 'b> TypeGeneralizer<'a, 'b> {
 
     fn generalize_type(&mut self, typ: &ArcType) -> Option<ArcType> {
         let replacement = self.subs.replace_variable(typ);
-        let mut typ = typ;
-        if let Some(ref t) = replacement {
-            typ = t;
-        }
+        let typ = replacement.as_ref().unwrap_or(typ);
+
         match **typ {
             Type::Variable(ref var) if self.subs.get_level(var.id) >= self.level => {
                 // Create a prefix if none exists

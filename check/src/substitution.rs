@@ -1,16 +1,16 @@
-use std::cell::RefCell;
-use std::default::Default;
-use std::fmt;
+use std::{cell::RefCell, default::Default, fmt};
 
 use union_find::{QuickFindUf, Union, UnionByRank, UnionFind, UnionResult};
 
-use base::fixed::{FixedMap, FixedVec};
-use base::types;
-use base::types::{ArcType, Type, Walker};
+use base::{
+    fixed::{FixedMap, FixedVec},
+    types::{self, ArcType, Type, Walker},
+};
 
 #[derive(Debug, PartialEq)]
 pub enum Error<T> {
     Occurs(T, T),
+    EscapingSkolem { skolem: T, variable: T },
 }
 
 impl<T> fmt::Display for Error<T>
@@ -21,8 +21,13 @@ where
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::Error::*;
 
-        match *self {
-            Occurs(ref var, ref typ) => write!(f, "Variable `{}` occurs in `{}`.", var, typ),
+        match self {
+            Occurs(var, typ) => write!(f, "Variable `{}` occurs in `{}`.", var, typ),
+            EscapingSkolem { skolem, variable } => write!(
+                f,
+                "Skolem type variable `{}` would escape because it is bound to `{}`.",
+                skolem, variable
+            ),
         }
     }
 }
@@ -105,42 +110,60 @@ pub trait Substitutable: Sized {
     }
 }
 
-pub fn occurs<T>(typ: &T, subs: &Substitution<T>, var: &T::Variable) -> bool
+pub fn occurs<T>(typ: &T, subs: &Substitution<T>, var: &T::Variable) -> Result<(), Error<T>>
 where
-    T: Substitutable,
+    T: Substitutable + Clone,
+    T::Variable: Clone,
 {
     struct Occurs<'a, T: Substitutable + 'a> {
-        occurs: bool,
         var: &'a T::Variable,
         subs: &'a Substitution<T>,
+        error: Option<Error<T>>,
     }
     impl<'a, 't, T> Walker<'t, T> for Occurs<'a, T>
     where
-        T: Substitutable,
+        T: Substitutable + Clone,
+        T::Variable: Clone,
     {
         fn walk(&mut self, typ: &'t T) {
-            if self.occurs {
+            if self.error.is_some() {
                 return;
             }
             let typ = self.subs.real(typ);
-            if let Some(other) = typ.get_var() {
-                if self.var.get_id() == other.get_id() {
-                    self.occurs = true;
-                    typ.traverse(self);
+            if let Some(other_id) = typ.get_id() {
+                if self.var.get_id() == other_id {
+                    self.error = Some(Error::Occurs(
+                        T::from_variable(self.var.clone()),
+                        typ.clone(),
+                    ));
                     return;
                 }
-                self.subs.update_level(self.var.get_id(), other.get_id());
+                let new_level = self.subs.update_level(self.var.get_id(), other_id);
+
+                if typ.get_var().is_none() {
+                    // Skolem
+                    if new_level < other_id {
+                        self.error = Some(Error::EscapingSkolem {
+                            skolem: typ.clone(),
+                            variable: T::from_variable(self.var.clone()),
+                        });
+                    }
+                }
             }
             typ.traverse(self);
         }
     }
     let mut occurs = Occurs {
-        occurs: false,
         var: var,
         subs: subs,
+        error: None,
     };
     occurs.walk(typ);
-    occurs.occurs
+    if let Some(err) = occurs.error {
+        Err(err)
+    } else {
+        Ok(())
+    }
 }
 
 /// Specialized union implementation which makes sure that variables with a higher level always
@@ -302,10 +325,11 @@ impl<T: Substitutable> Substitution<T> {
     }
 
     /// Updates the level of `other` to be the minimum level value of `var` and `other`
-    pub fn update_level(&self, var: u32, other: u32) {
+    pub fn update_level(&self, var: u32, other: u32) -> u32 {
         let level = ::std::cmp::min(self.get_level(var), self.get_level(other));
         let mut union = self.union.borrow_mut();
         union.get_mut(other as usize).level = level;
+        level
     }
 
     pub fn set_level(&self, var: u32, level: u32) {
@@ -315,7 +339,7 @@ impl<T: Substitutable> Substitution<T> {
 
     pub fn get_level(&self, mut var: u32) -> u32 {
         if let Some(v) = self.find_type_for_var(var) {
-            var = v.get_var().map_or(var, |v| v.get_id());
+            var = v.get_id().unwrap_or(var);
         }
         let mut union = self.union.borrow_mut();
         let level = &mut union.get_mut(var as usize).level;
@@ -364,9 +388,7 @@ impl<T: Substitutable + PartialEq + Clone> Substitution<T> {
         {
             return Ok(None);
         }
-        if occurs(typ, self, id) {
-            return Err(Error::Occurs(T::from_variable(id.clone()), typ.clone()));
-        }
+        occurs(typ, self, id)?;
         {
             let id_type = self.find_type_for_var(id.get_id());
             let other_type = self.real(typ);

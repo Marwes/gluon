@@ -1243,6 +1243,7 @@ impl<'a, 'e> Unifier<State<'a>, ArcType> for UnifierState<'a, Subsume<'e>> {
         l: &ArcType,
         r: &ArcType,
     ) -> Result<Option<ArcType>, UnifyError<ArcType, TypeError<Symbol>>> {
+        debug!("{} <=> {}", l, r);
         let subs = self.unifier.subs;
         // Retrieve the 'real' types by resolving
         let l = subs.real(l);
@@ -1253,13 +1254,14 @@ impl<'a, 'e> Unifier<State<'a>, ArcType> for UnifierState<'a, Subsume<'e>> {
             (&Type::Hole, _) => Ok(Some(r.clone())),
             (&Type::Variable(ref l), &Type::Variable(ref r)) if l.id == r.id => Ok(None),
             (&Type::Skolem(ref skolem), &Type::Variable(ref var)) => {
+                subs.union(var, l)?;
+
                 let skolem_level = subs.get_level(skolem.id);
-                if skolem_level > var.id {
+                if skolem_level > subs.get_level(var.id) {
                     Err(UnifyError::Other(TypeError::UnableToGeneralize(
                         skolem.name.clone(),
                     )))
                 } else {
-                    subs.union(var, l)?;
                     Ok(None)
                 }
             }

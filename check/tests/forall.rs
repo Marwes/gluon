@@ -1333,6 +1333,5 @@ test_check_err! {
     let new : ST s (Test s) = any ()
     run new
     "#,
-    TypeError::Message(_),
-    TypeError::Message(_)
+    TypeError::Unification(..)
 }
