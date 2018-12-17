@@ -420,7 +420,7 @@ pub fn generate_for_path_(thread: &Thread, path: &Path, out_path: &Path) -> Resu
             || entry.path().extension().and_then(|ext| ext.to_str()) != Some("glu")
         {
             if entry.file_type().is_dir() {
-                directories.insert(entry.path().to_owned(), Vec::new());
+                directories.insert(entry.path().to_owned(), BTreeMap::new());
             }
             continue;
         }
@@ -467,7 +467,7 @@ pub fn generate_for_path_(thread: &Thread, path: &Path, out_path: &Path) -> Resu
         directories
             .get_mut(entry.path().parent().expect("Parent path"))
             .expect("Directory before this file")
-            .push(module);
+            .insert(module.name.clone(), module);
     }
 
     #[derive(Serialize)]
@@ -480,7 +480,7 @@ pub fn generate_for_path_(thread: &Thread, path: &Path, out_path: &Path) -> Resu
     let reg = handlebars()?;
 
     for (path, modules) in &directories {
-        for module in modules {
+        for module in modules.values() {
             let out_path =
                 out_path.join(PathBuf::from(module.name.replace(".", "/")).with_extension("html"));
             let mut doc_file = File::create(&*out_path).with_context(|err| {
