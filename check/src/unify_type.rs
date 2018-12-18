@@ -87,13 +87,6 @@ impl<'a> State<'a> {
                     typ = types::walk_move_type(typ.clone(), &mut |typ| match **typ {
                         Type::Forall(_, _, None) => {
                             let typ = new_skolem_scope(subs, typ);
-                            if let Type::Forall(_, _, Some(ref vars)) = *typ {
-                                for var in vars {
-                                    if let Type::Variable(ref var) = **var {
-                                        subs.set_level(var.id, 0);
-                                    }
-                                }
-                            }
                             Some(typ)
                         }
                         _ => None,

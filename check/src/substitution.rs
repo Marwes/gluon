@@ -117,6 +117,7 @@ where
 {
     struct Occurs<'a, T: Substitutable + 'a> {
         var: &'a T::Variable,
+        typ: &'a T,
         subs: &'a Substitution<T>,
         error: Option<Error<T>>,
     }
@@ -134,7 +135,7 @@ where
                 if self.var.get_id() == other_id {
                     self.error = Some(Error::Occurs(
                         T::from_variable(self.var.clone()),
-                        typ.clone(),
+                        self.typ.clone(),
                     ));
                     return;
                 }
@@ -154,8 +155,9 @@ where
         }
     }
     let mut occurs = Occurs {
-        var: var,
-        subs: subs,
+        var,
+        typ,
+        subs,
         error: None,
     };
     occurs.walk(typ);
@@ -267,6 +269,15 @@ impl<T: Substitutable> Substitution<T> {
         }
     }
 
+    pub fn new_unbound_var(&self) -> T
+    where
+        T: Clone,
+    {
+        let var = self.new_var();
+        self.set_level(var.get_id().unwrap(), u32::max_value());
+        var
+    }
+
     /// Creates a new variable
     pub fn new_var(&self) -> T
     where
@@ -282,13 +293,18 @@ impl<T: Substitutable> Substitution<T> {
     {
         let var_id = self.variables.len() as u32;
         let id = self.union.borrow_mut().insert(UnionByLevel {
-            ..UnionByLevel::default()
+            rank: UnionByRank::default(),
+            level: var_id,
         });
         assert!(id == self.variables.len());
-        debug!("New var {}", self.variables.len());
 
         let var = f(var_id);
         self.variables.push(var.clone().into());
+        debug!(
+            "New var {}: {}",
+            self.variables.len() - 1,
+            self.get_level(var.get_id().unwrap())
+        );
         var
     }
 
@@ -342,9 +358,7 @@ impl<T: Substitutable> Substitution<T> {
             var = v.get_id().unwrap_or(var);
         }
         let mut union = self.union.borrow_mut();
-        let level = &mut union.get_mut(var as usize).level;
-        *level = ::std::cmp::min(*level, var);
-        *level
+        union.get(var as usize).level
     }
 
     pub fn replace_variable(&self, typ: &T) -> Option<T>

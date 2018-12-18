@@ -160,3 +160,14 @@ let run_alt eff_1 eff_2 : Eff [| alt : Alt | r |] a -> Eff [| alt : Alt | r |] a
     "#,
     "()"
 }
+
+test_check! {
+    convert_variant_escaping_skolem,
+    r#"
+type Writer s a = forall r . (| Tell s .. r)
+
+let extract_writer x : forall s . [| writer : Writer s | r |] a -> Writer s a = convert_variant! x
+()
+    "#,
+    "()"
+}
