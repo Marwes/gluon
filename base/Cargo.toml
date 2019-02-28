@@ -16,7 +16,7 @@ bitflags = "1"
 log = "0.4"
 quick-error = "1.0.0"
 fnv = "1.0.3"
-pretty = "0.5"
+pretty = { path = "../../pretty.rs" }
 smallvec = "0.6"
 collect-mac = "0.1.0"
 anymap = "0.12.0"

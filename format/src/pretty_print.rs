@@ -359,19 +359,29 @@ where
                 x.append(y).group()
             }
 
-            Expr::Tuple { ref elems, .. } => chain![arena;
-                "(",
-                arena.concat(
-                    self.comma_sep_paren(
-                    elems
-                        .iter()
-                        .map(|elem| pos::spanned(elem.span, pretty(elem))),
-                    |spanned| spanned.value,
-                    ),
-                ),
-                ")"
-            ]
-            .group(),
+            Expr::Tuple { ref elems, .. } => {
+                let inner = chain![arena;
+                    arena.space_(),
+                    arena.concat(
+                        self.comma_sep_paren(
+                        elems
+                            .iter()
+                            .map(|elem| pos::spanned(elem.span, pretty(elem))),
+                        |spanned| spanned.value,
+                        ),
+                    )
+                ];
+                chain![arena;
+                    "(",
+                    if elems.len() == 1 {
+                        inner
+                    } else {
+                        inner.nest(INDENT).append(arena.space_())
+                    },
+                    ")"
+                ]
+                .group()
+            }
 
             Expr::TypeBindings(ref binds, ref body) => {
                 let is_recursive = binds.len() > 1;
