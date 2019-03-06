@@ -223,7 +223,8 @@ impl<'de> de::DeserializeState<'de, ActiveThread<'de>> for JsonValue {
             where
                 E: de::Error,
             {
-                let value = crate::api::convert_with_active_thread(self.0, value).map_err(E::custom)?;
+                let value =
+                    crate::api::convert_with_active_thread(self.0, value).map_err(E::custom)?;
                 Ok(self.marshal(Value::String(value)))
             }
 
@@ -232,7 +233,8 @@ impl<'de> de::DeserializeState<'de, ActiveThread<'de>> for JsonValue {
             where
                 E: de::Error,
             {
-                let value = crate::api::convert_with_active_thread(self.0, value).map_err(E::custom)?;
+                let value =
+                    crate::api::convert_with_active_thread(self.0, value).map_err(E::custom)?;
                 Ok(self.marshal(Value::String(value)))
             }
 
