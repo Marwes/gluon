@@ -999,3 +999,29 @@ let transformer : Transformer (StateT s) =
 "#,
 "()"
 }
+
+test_check! {
+unable_to_resolve_double_nested_instance,
+r#"
+#[implicit]
+type Functor f = {
+    map : forall a b . (a -> b) -> f a -> f b
+}
+#[implicit]
+type Applicative f = {
+    functor : Functor f,
+}
+#[implicit]
+type Monad m = { functor : Applicative m }
+
+let any x = any x
+
+let eval_state_t f : [Functor m] -> m a -> () = ()
+
+let associativity mx : [Monad m] -> m a -> () =
+    eval_state_t mx
+
+()
+"#,
+"()"
+}
