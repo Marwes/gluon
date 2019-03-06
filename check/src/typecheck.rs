@@ -2017,7 +2017,7 @@ impl<'a> Typecheck<'a> {
             let bindings = self.implicit_resolver.implicit_bindings.last_mut().unwrap();
 
             let stack = &self.environment.stack;
-            bindings.update(|name| Some(stack.get(name).unwrap().typ.concrete.clone()));
+            bindings.update(|name| stack.get(name).map(|b| b.typ.concrete.clone()));
         }
 
         debug!("Typecheck `in`");

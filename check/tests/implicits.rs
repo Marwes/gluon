@@ -873,6 +873,31 @@ f 1
     assert!(result.is_ok(), "{}", result.unwrap_err());
 }
 
+#[test]
+fn allow_sub_classed_duplicate() {
+    let _ = ::env_logger::try_init();
+    let text = r#"
+#[implicit]
+type Base a = { x : a }
+#[implicit]
+type Derived a = { base : Base a, y : a }
+#[implicit]
+type Derived2 a = { derived : Derived a, z : a }
+
+let { ? } = 
+    let base : Base Int = { x = 0 }
+    let derived : Derived Int = { base, y = 1 }
+    let derived2 : Derived2 Int = { derived, z = 2 }
+    { base, derived, derived2 }
+
+let f ?b x : [Base a] -> a -> a = b.x
+f 1
+"#;
+    let result = support::typecheck(text);
+
+    assert!(result.is_ok(), "{}", result.unwrap_err());
+}
+
 test_check_err! {
 break_infinite_implicit_resolve_early,
     r#"
@@ -994,6 +1019,32 @@ let transformer : Transformer (StateT s) =
     let wrap_monad : [Monad m] -> m a -> StateT s m a = any ()
 
     { wrap_monad }
+
+()
+"#,
+"()"
+}
+
+test_check! {
+unable_to_resolve_double_nested_instance,
+r#"
+#[implicit]
+type Functor f = {
+    map : forall a b . (a -> b) -> f a -> f b
+}
+#[implicit]
+type Applicative f = {
+    functor : Functor f,
+}
+#[implicit]
+type Monad m = { functor : Applicative m }
+
+let any x = any x
+
+let eval_state_t f : [Functor m] -> m a -> () = ()
+
+let associativity mx : [Monad m] -> m a -> () =
+    eval_state_t mx
 
 ()
 "#,

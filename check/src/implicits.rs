@@ -245,8 +245,7 @@ impl Partition<ImplicitBinding> {
                 let opt = {
                     let bind = vec.get(i).unwrap();
                     if bind.0.len() == 1 {
-                        let typ = f(&bind.0[0].name).unwrap();
-                        Some((bind.0.clone(), typ))
+                        f(&bind.0[0].name).map(|typ| ((bind.0.clone(), typ)))
                     } else {
                         None
                     }
@@ -745,9 +744,18 @@ impl<'a> ImplicitResolver<'a> {
         if self.implicit_bindings.is_empty() {
             self.implicit_bindings.push(ImplicitBindings::new());
         }
+        self.add_implicits_of_record(subs, id, typ);
+
         let metadata = self.metadata.get(id);
 
-        let opt = self.try_create_implicit(&id, metadata.map(|m| &**m), &typ, &mut Vec::new());
+        let opt = self.try_create_implicit(
+            metadata.map(|m| &**m),
+            &typ,
+            &[TypedIdent {
+                name: id.clone(),
+                typ: typ.clone(),
+            }],
+        );
 
         if let Some((definition, path, implicit_type)) = opt {
             self.implicit_bindings.last_mut().unwrap().insert(
@@ -761,15 +769,38 @@ impl<'a> ImplicitResolver<'a> {
 
     pub fn add_implicits_of_record(
         &mut self,
-        mut subs: &Substitution<RcType>,
+        subs: &Substitution<RcType>,
         id: &Symbol,
         typ: &RcType,
     ) {
-        info!("Trying to resolve implicit {}", typ);
-
         if self.implicit_bindings.is_empty() {
             self.implicit_bindings.push(ImplicitBindings::new());
         }
+
+        let meta = self.metadata.get(id).cloned();
+        self.add_implicits_of_record_rec(
+            subs,
+            id,
+            typ,
+            meta.as_ref().map(|m| &**m),
+            &mut Vec::new(),
+        );
+    }
+
+    fn add_implicits_of_record_rec(
+        &mut self,
+        mut subs: &Substitution<RcType>,
+        id: &Symbol,
+        typ: &RcType,
+        metadata: Option<&Metadata>,
+        path: &mut Vec<TypedIdent<Symbol, RcType>>,
+    ) {
+        info!("Adding implicits of {}", typ);
+
+        path.push(TypedIdent {
+            name: id.clone(),
+            typ: typ.clone(),
+        });
 
         let mut alias_resolver = resolve::AliasRemover::new();
 
@@ -783,24 +814,12 @@ impl<'a> ImplicitResolver<'a> {
             };
         match *raw_type {
             Type::Record(_) => {
-                let metadata = self.metadata.get(id);
-
-                let mut path = vec![TypedIdent {
-                    name: id.clone(),
-                    typ: typ.clone(),
-                }];
-
                 for field in raw_type.row_iter() {
                     let field_metadata = metadata
-                        .as_ref()
-                        .and_then(|metadata| metadata.module.get(field.name.as_pretty_str()));
+                        .and_then(|metadata| metadata.module.get(field.name.as_pretty_str()))
+                        .map(|m| &**m);
 
-                    let opt = self.try_create_implicit(
-                        &field.name,
-                        field_metadata.map(|m| &**m),
-                        &field.typ,
-                        &mut path,
-                    );
+                    let opt = self.try_create_implicit(field_metadata, &field.typ, path);
 
                     if let Some((definition, path, implicit_type)) = opt {
                         self.implicit_bindings.last_mut().unwrap().insert(
@@ -810,18 +829,27 @@ impl<'a> ImplicitResolver<'a> {
                             &implicit_type,
                         );
                     }
+
+                    self.add_implicits_of_record_rec(
+                        subs,
+                        &field.name,
+                        &field.typ,
+                        field_metadata,
+                        path,
+                    );
                 }
             }
             _ => (),
         }
+
+        path.pop();
     }
 
     pub fn try_create_implicit<'m>(
         &self,
-        id: &Symbol,
         metadata: Option<&'m Metadata>,
         typ: &RcType,
-        path: &mut Vec<TypedIdent<Symbol, RcType>>,
+        path: &[TypedIdent<Symbol, RcType>],
     ) -> Option<(Option<&'m Symbol>, Vec<TypedIdent<Symbol, RcType>>, RcType)> {
         let has_implicit_attribute =
             |metadata: &Metadata| metadata.get_attribute("implicit").is_some();
@@ -861,11 +889,7 @@ impl<'a> ImplicitResolver<'a> {
                 }
             }
 
-            let mut path = path.clone();
-            path.push(TypedIdent {
-                name: id.clone(),
-                typ: typ.clone(),
-            });
+            let path = path.to_owned();
             Some((
                 metadata.and_then(|m| m.definition.as_ref()),
                 path,
