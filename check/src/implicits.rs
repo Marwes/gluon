@@ -245,8 +245,7 @@ impl Partition<ImplicitBinding> {
                 let opt = {
                     let bind = vec.get(i).unwrap();
                     if bind.0.len() == 1 {
-                        let typ = f(&bind.0[0].name).unwrap();
-                        Some((bind.0.clone(), typ))
+                        f(&bind.0[0].name).map(|typ| ((bind.0.clone(), typ)))
                     } else {
                         None
                     }
@@ -747,7 +746,14 @@ impl<'a> ImplicitResolver<'a> {
         }
         let metadata = self.metadata.get(id);
 
-        let opt = self.try_create_implicit(metadata.map(|m| &**m), &typ, &[TypedIdent { name:id.clone(), typ: typ.clone()}]);
+        let opt = self.try_create_implicit(
+            metadata.map(|m| &**m),
+            &typ,
+            &[TypedIdent {
+                name: id.clone(),
+                typ: typ.clone(),
+            }],
+        );
 
         if let Some((definition, path, implicit_type)) = opt {
             self.implicit_bindings.last_mut().unwrap().insert(
@@ -765,6 +771,10 @@ impl<'a> ImplicitResolver<'a> {
         id: &Symbol,
         typ: &RcType,
     ) {
+        if self.implicit_bindings.is_empty() {
+            self.implicit_bindings.push(ImplicitBindings::new());
+        }
+
         self.add_implicits_of_record_rec(subs, id, typ, &mut Vec::new())
     }
 
@@ -777,15 +787,10 @@ impl<'a> ImplicitResolver<'a> {
     ) {
         info!("Adding implicits of {}", typ);
 
-                path.push(TypedIdent {
-                    name: id.clone(),
-                    typ: typ.clone(),
-                });
-
-
-        if self.implicit_bindings.is_empty() {
-            self.implicit_bindings.push(ImplicitBindings::new());
-        }
+        path.push(TypedIdent {
+            name: id.clone(),
+            typ: typ.clone(),
+        });
 
         let mut alias_resolver = resolve::AliasRemover::new();
 
@@ -799,18 +804,15 @@ impl<'a> ImplicitResolver<'a> {
             };
         match *raw_type {
             Type::Record(_) => {
-                let metadata : Option<Arc<_>> = self.metadata.get(id).cloned();
+                let metadata: Option<Arc<_>> = self.metadata.get(id).cloned();
 
                 for field in raw_type.row_iter() {
                     let field_metadata = metadata
                         .as_ref()
                         .and_then(|metadata| metadata.module.get(field.name.as_pretty_str()));
 
-                    let opt = self.try_create_implicit(
-                        field_metadata.map(|m| &**m),
-                        &field.typ,
-                        path,
-                    );
+                    let opt =
+                        self.try_create_implicit(field_metadata.map(|m| &**m), &field.typ, path);
 
                     if let Some((definition, path, implicit_type)) = opt {
                         self.implicit_bindings.last_mut().unwrap().insert(
@@ -823,12 +825,11 @@ impl<'a> ImplicitResolver<'a> {
 
                     self.add_implicits_of_record(subs, &field.name, &field.typ);
                 }
-
             }
             _ => (),
         }
 
-                path.pop();
+        path.pop();
     }
 
     pub fn try_create_implicit<'m>(
