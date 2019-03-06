@@ -14,9 +14,9 @@ use crate::vm;
 use crate::{Result, Variants};
 
 #[cfg(feature = "serde")]
-use std::result::Result as StdResult;
-#[cfg(feature = "serde")]
 use crate::thread::RootedThread;
+#[cfg(feature = "serde")]
+use std::result::Result as StdResult;
 
 #[cfg(feature = "serde")]
 use crate::serde::de::{Deserialize, Deserializer};

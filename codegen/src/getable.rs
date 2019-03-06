@@ -90,7 +90,7 @@ where
                 #ident (
                 <#field_ty as _gluon_api::Getable<'__vm, '__value>>::from_value(vm, variants)
                 )
-            }
+            };
         }
         _ => (),
     }
