@@ -744,7 +744,6 @@ impl<'a> ImplicitResolver<'a> {
         if self.implicit_bindings.is_empty() {
             self.implicit_bindings.push(ImplicitBindings::new());
         }
-        self.add_implicits_of_record(subs, id, typ);
 
         let metadata = self.metadata.get(id);
 
@@ -795,7 +794,9 @@ impl<'a> ImplicitResolver<'a> {
         metadata: Option<&Metadata>,
         path: &mut Vec<TypedIdent<Symbol, RcType>>,
     ) {
-        info!("Adding implicits of {}", typ);
+        if id.declared_name().contains("ord") {
+            error!("Adding implicits of {}", typ);
+        }
 
         path.push(TypedIdent {
             name: id.clone(),
