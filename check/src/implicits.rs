@@ -316,6 +316,36 @@ impl ImplicitBindings {
             .into_iter()
             .flat_map(|x| x)
     }
+
+    pub fn fmt_tree(&self) -> impl fmt::Display {
+        fn fmt_tree(self_: &Partition<ImplicitBinding>, indent: &str) -> impl fmt::Display {
+            let mut indent = indent.to_owned();
+            indent.push_str("    ");
+            format!(
+                "Partition {{\n{indent}partitition: [{}],\n{indent}rest: [{}],\n{indent}}}\n",
+                self_
+                    .partition
+                    .iter()
+                    .map(|(k, v)| format!(
+                        "{} => {}",
+                        Borrow::<SymbolRef>::borrow(k),
+                        fmt_tree(v, &indent)
+                    ))
+                    .format(","),
+                self_
+                    .rest
+                    .iter()
+                    .map(|t| format!(
+                        "{}: {}",
+                        t.0.iter().map(|i| i.name.as_str()).format("."),
+                        t.1
+                    ))
+                    .format(","),
+                indent = indent.clone()
+            )
+        }
+        fmt_tree(&self.partition, &mut "")
+    }
 }
 
 type Result<T> = ::std::result::Result<T, Error<RcType>>;
@@ -606,6 +636,8 @@ impl<'a, 'b> ResolveImplicitsVisitor<'a, 'b> {
         let mut candidates = implicit_bindings
             .get_candidates(&self.tc.subs, &demand.constraint)
             .rev();
+        error!("{}", demand.constraint);
+        error!("{}", implicit_bindings.fmt_tree());
         let found_candidate = candidates.by_ref().find(|x| {
             let (path, typ) = &***x;
             self.try_resolve_implicit(path, to_resolve, demand, typ)
@@ -776,14 +808,14 @@ impl<'a> ImplicitResolver<'a> {
             self.implicit_bindings.push(ImplicitBindings::new());
         }
 
+        let mut path = Vec::new();
+        path.push(TypedIdent {
+            name: id.clone(),
+            typ: typ.clone(),
+        });
+
         let meta = self.metadata.get(id).cloned();
-        self.add_implicits_of_record_rec(
-            subs,
-            id,
-            typ,
-            meta.as_ref().map(|m| &**m),
-            &mut Vec::new(),
-        );
+        self.add_implicits_of_record_rec(subs, id, typ, meta.as_ref().map(|m| &**m), &mut path);
     }
 
     fn add_implicits_of_record_rec(
@@ -797,11 +829,6 @@ impl<'a> ImplicitResolver<'a> {
         if id.declared_name().contains("ord") {
             error!("Adding implicits of {}", typ);
         }
-
-        path.push(TypedIdent {
-            name: id.clone(),
-            typ: typ.clone(),
-        });
 
         let mut alias_resolver = resolve::AliasRemover::new();
 
@@ -820,9 +847,19 @@ impl<'a> ImplicitResolver<'a> {
                         .and_then(|metadata| metadata.module.get(field.name.as_pretty_str()))
                         .map(|m| &**m);
 
+                    path.push(TypedIdent {
+                        name: field.name.clone(),
+                        typ: field.typ.clone(),
+                    });
+
                     let opt = self.try_create_implicit(field_metadata, &field.typ, path);
 
                     if let Some((definition, path, implicit_type)) = opt {
+                        error!(
+                            "Insert {}: {}",
+                            path.iter().map(|id| &id.name).format("."),
+                            implicit_type
+                        );
                         self.implicit_bindings.last_mut().unwrap().insert(
                             subs,
                             definition,
@@ -838,12 +875,12 @@ impl<'a> ImplicitResolver<'a> {
                         field_metadata,
                         path,
                     );
+
+                    path.pop();
                 }
             }
             _ => (),
         }
-
-        path.pop();
     }
 
     pub fn try_create_implicit<'m>(
