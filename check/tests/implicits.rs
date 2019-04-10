@@ -1093,3 +1093,24 @@ let ord ?ord : [Ord a] -> Ord (Array a) =
 "#,
 "()"
 }
+
+test_check! {
+ord_array_implicit_resolution2,
+r#"
+
+#[implicit]
+type Eq a = { (==) : a -> a -> Bool }
+
+#[implicit]
+type Ord a = { eq : Eq a, compare : a -> a -> () }
+
+let eq ?eq : [Eq a] -> Eq (Array a) =
+    { (==) = \x y -> False }
+
+let ord ?ord : [Ord a] -> Ord (Array a) =
+    { eq, compare = \_ _ -> () }
+
+()
+"#,
+"()"
+}
