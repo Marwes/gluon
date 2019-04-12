@@ -41,6 +41,7 @@ where
     /// stored here. As the type stored will never changed we use a `FixedVecMap` lets `real` return
     /// `&T` from this map safely.
     types: FixedVecMap<T>,
+    types_undo: RefCell<Vec<u32>>,
     factory: T::Factory,
     interner: T::Interner,
     variable_cache: RefCell<Vec<T>>,
@@ -186,6 +187,12 @@ where
     occurs.occurs
 }
 
+pub struct Snapshot {
+    snapshot: ena::unify::Snapshot<ena::unify::InPlace<UnionByLevel>>,
+    level: u32,
+    types_undo_len: usize,
+}
+
 /// Specialized union implementation which makes sure that variables with a higher level always
 /// point to the lower level variable.
 ///
@@ -193,7 +200,7 @@ where
 /// map.find(2) -> 1
 /// map.find(1) -> 1
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-struct UnionByLevel {
+pub struct UnionByLevel {
     index: u32,
 }
 
@@ -204,7 +211,7 @@ impl From<u32> for UnionByLevel {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-struct Level(u32);
+pub struct Level(u32);
 
 impl ena::unify::UnifyValue for Level {
     type Error = ena::unify::NoError;
@@ -262,6 +269,7 @@ where
             union: RefCell::new(ena::unify::InPlaceUnificationTable::new()),
             variables: FixedVec::new(),
             types: FixedVecMap::new(),
+            types_undo: Default::default(),
             factory: factory,
             interner,
             variable_cache: Default::default(),
@@ -278,20 +286,48 @@ where
                 "Tried to insert variable which is not allowed as that would cause memory \
                  unsafety"
             ),
-            None => match self.types.try_insert(var as usize, t.into()) {
-                Ok(()) => (),
-                Err(_) => ice!("Expected variable to not have a type associated with it"),
-            },
+            None => {
+                self.types_undo.borrow_mut().push(var);
+                match self.types.try_insert(var as usize, t.into()) {
+                    Ok(()) => (),
+                    Err(_) => ice!("Expected variable to not have a type associated with it"),
+                }
+            }
         }
     }
 
     pub fn replace(&mut self, var: u32, t: T) {
         debug_assert!(t.get_id() != Some(var));
+        self.types_undo.borrow_mut().push(var);
         self.types.insert(var as usize, t.into());
     }
 
     pub fn reset(&mut self, var: u32) {
         self.types.remove(var as usize);
+    }
+
+    pub fn snapshot(&mut self) -> Snapshot {
+        Snapshot {
+            snapshot: self.union.get_mut().snapshot(),
+            level: self.var_id(),
+            types_undo_len: self.types_undo.get_mut().len(),
+        }
+    }
+
+    pub fn commit(&mut self, snapshot: Snapshot) {
+        self.union.get_mut().commit(snapshot.snapshot);
+    }
+
+    pub fn rollback_to(&mut self, snapshot: Snapshot) {
+        self.union.get_mut().rollback_to(snapshot.snapshot);
+        let variable_cache = self.variable_cache.get_mut();
+        while self.variables.len() > snapshot.level as usize {
+            variable_cache.push(self.variables.pop().unwrap());
+        }
+
+        for i in self.types_undo.get_mut().drain(snapshot.types_undo_len..) {
+            self.types.remove(i as usize);
+        }
     }
 
     /// Assumes that no variables unified with anything (but variables < level may exist)
@@ -302,7 +338,7 @@ where
             u.new_key(Level(::std::u32::MAX));
         }
 
-        let mut variable_cache = self.variable_cache.borrow_mut();
+        let variable_cache = self.variable_cache.get_mut();
         // Since no types should be unified with anything we can remove all of this and reuse the
         // unique values
         variable_cache.extend(self.types.drain().filter(T::is_unique));
@@ -314,7 +350,7 @@ where
     /// Creates a new variable
     pub fn new_var(&self) -> T
     where
-        T: Clone,
+        T: Clone + fmt::Display,
     {
         self.new_var_fn(|var| match self.variable_cache.borrow_mut().pop() {
             Some(mut typ) => {
