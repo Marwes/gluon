@@ -1235,7 +1235,7 @@ impl ThreadInternal for Thread {
             .stack
             .extend(&[Variants::int(0), value, Variants::int(0)]);
 
-        context.borrow_mut().enter_scope(2, &State::Unknown);
+        context.borrow_mut().enter_scope(2, &State::Unknown, false);
         context = match try_future!(self.call_function(context, 1), Either::A) {
             Async::Ready(context) => context.expect("call_module to have the stack remaining"),
             Async::NotReady => return Either::B(Execute::new(self.root_thread())),
@@ -1813,10 +1813,9 @@ impl<'b> OwnedContext<'b> {
                         );
 
                         let closure_context = context.from_state();
-                        let new_context = try_ready!(closure_context.execute_());
-                        context = self.borrow_mut();
-                        if new_context.is_none() {
-                            return Ok(None.into());
+                        match try_ready!(closure_context.execute_()) {
+                            Some(new_context) => context = new_context,
+                            None => return Ok(None.into()),
                         }
                     }
                 }
@@ -2039,7 +2038,7 @@ where
 }
 
 impl<'b, 'gc> ExecuteContext<'b, 'gc> {
-    fn execute_(mut self) -> Result<Async<Option<()>>> {
+    fn execute_(mut self) -> Result<Async<Option<ExecuteContext<'b, 'gc, State>>>> {
         unsafe fn lock_gc<'gc>(gc: &'gc Gc, value: &Value) -> Variants<'gc> {
             Variants::with_root(value, gc)
         }
@@ -2499,7 +2498,11 @@ impl<'b, 'gc> ExecuteContext<'b, 'gc> {
                 x => ice!("Expected excess arguments found {:?}", x),
             }
         } else {
-            Ok(Async::Ready(if stack_exists { Some(()) } else { None }))
+            Ok(Async::Ready(if stack_exists {
+                Some(context)
+            } else {
+                None
+            }))
         }
     }
 
@@ -2544,11 +2547,22 @@ impl<'b, 'gc, S> ExecuteContext<'b, 'gc, S>
 where
     S: StackState,
 {
-    fn enter_scope<T>(self, args: VmIndex, state: &T) -> ExecuteContext<'b, 'gc, T>
+    fn to_state(self) -> ExecuteContext<'b, 'gc, State> {
+        ExecuteContext {
+            thread: self.thread,
+            stack: self.stack.to_state(),
+            gc: self.gc,
+            hook: self.hook,
+            max_stack_size: self.max_stack_size,
+            poll_fns: self.poll_fns,
+        }
+    }
+
+    fn enter_scope<T>(self, args: VmIndex, state: &T, excess: bool) -> ExecuteContext<'b, 'gc, T>
     where
         T: StackState,
     {
-        let stack = self.stack.enter_scope(args, state.clone());
+        let stack = self.stack.enter_scope_excess(args, state.clone(), excess);
         self.hook.previous_instruction_index = usize::max_value();
         ExecuteContext {
             thread: self.thread,
@@ -2593,24 +2607,32 @@ where
         }
     }
 
-    fn enter_closure(self, closure: &GcPtr<ClosureData>, excess: bool) -> Result<()> {
-        let mut next = self.enter_scope(
+    fn enter_closure(
+        self,
+        closure: &GcPtr<ClosureData>,
+        excess: bool,
+    ) -> ExecuteContext<'b, 'gc, State> {
+        self.enter_scope(
             closure.function.args,
             &*construct_gc!(ClosureState {
                 @closure,
                 instruction_index: 0,
             }),
-        );
-        next.stack.set_excess(excess);
-        Ok(())
+            excess,
+        )
+        .to_state()
     }
 
-    fn enter_extern(self, ext: &GcPtr<ExternFunction>, excess: bool) -> Result<()> {
+    fn enter_extern(
+        self,
+        ext: &GcPtr<ExternFunction>,
+        excess: bool,
+    ) -> ExecuteContext<'b, 'gc, State> {
         assert!(self.stack.len() >= ext.args + 1);
         let function_index = self.stack.len() - ext.args - 1;
         trace!("------- {} {:?}", function_index, &self.stack[..]);
-        self.enter_scope(ext.args, &*ExternState::new(ext));
-        Ok(())
+        self.enter_scope(ext.args, &*ExternState::new(ext), excess)
+            .to_state()
     }
 
     fn call_function_with_upvars(
@@ -2618,14 +2640,14 @@ where
         args: VmIndex,
         required_args: VmIndex,
         callable: &Callable,
-        enter_scope: impl FnOnce(Self, bool) -> Result<()>,
-    ) -> Result<()> {
+        enter_scope: impl FnOnce(Self, bool) -> ExecuteContext<'b, 'gc, State>,
+    ) -> Result<ExecuteContext<'b, 'gc, State>> {
         trace!("cmp {} {} {:?} {:?}", args, required_args, callable, {
             let function_index = self.stack.len() - 1 - args;
             &(*self.stack)[(function_index + 1) as usize..]
         });
         match args.cmp(&required_args) {
-            Ordering::Equal => enter_scope(self, false),
+            Ordering::Equal => Ok(enter_scope(self, false)),
             Ordering::Less => {
                 let app = {
                     let fields = &self.stack[self.stack.len() - args..];
@@ -2634,7 +2656,7 @@ where
                 };
                 self.stack.pop_many(args + 1);
                 self.stack.push(app);
-                Ok(())
+                Ok(self.to_state())
             }
             Ordering::Greater => {
                 let excess_args = args - required_args;
@@ -2661,12 +2683,12 @@ where
                     &(*self.stack)[..],
                     self.stack.stack().get_frames()
                 );
-                enter_scope(self, true)
+                Ok(enter_scope(self, true))
             }
         }
     }
 
-    fn do_call(mut self, args: VmIndex) -> Result<()> {
+    fn do_call(mut self, args: VmIndex) -> Result<ExecuteContext<'b, 'gc, State>> {
         let function_index = self.stack.len() - 1 - args;
         debug!(
             "Do call {:?} {:?}",
@@ -2675,12 +2697,6 @@ where
         );
         let value = unsafe { self.stack[function_index].get_repr().clone_unrooted() };
         match &value {
-            Function(f) => {
-                let callable = construct_gc!(Callable::Extern(@gc::Borrow::new(f)));
-                self.call_function_with_upvars(args, f.args, &callable, |self_, excess| {
-                    self_.enter_extern(f, excess)
-                })
-            }
             Closure(closure) => {
                 let callable = construct_gc!(Callable::Closure(@gc::Borrow::new(closure)));
                 self.call_function_with_upvars(
@@ -2689,6 +2705,12 @@ where
                     &callable,
                     |self_, excess| self_.enter_closure(closure, excess),
                 )
+            }
+            Function(f) => {
+                let callable = construct_gc!(Callable::Extern(@gc::Borrow::new(f)));
+                self.call_function_with_upvars(args, f.args, &callable, |self_, excess| {
+                    self_.enter_extern(f, excess)
+                })
             }
             PartialApplication(app) => {
                 let total_args = app.args.len() as VmIndex + args;

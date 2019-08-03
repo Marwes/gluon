@@ -900,15 +900,6 @@ impl CloneUnrooted for Callable {
     }
 }
 
-impl Callable {
-    pub fn args(&self) -> VmIndex {
-        match *self {
-            Callable::Closure(ref closure) => closure.function.args,
-            Callable::Extern(ref ext) => ext.args,
-        }
-    }
-}
-
 impl PartialEq for Callable {
     fn eq(&self, _: &Callable) -> bool {
         false

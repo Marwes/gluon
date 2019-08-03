@@ -631,7 +631,7 @@ impl<'a: 'b, 'b> StackFrame<'b, State> {
     }
 
     pub fn new_frame(stack: &'b mut Stack, args: VmIndex, state: State) -> StackFrame<'b> {
-        let frame = unsafe { Self::add_new_frame(stack, args, gc::Borrow::new(&state)).unrooted() };
+        let frame = unsafe { Self::add_new_frame(stack, args, &state, false).unrooted() };
         StackFrame { stack, frame }
     }
 }
@@ -651,6 +651,13 @@ impl<'a: 'b, 'b, S> StackFrame<'b, S>
 where
     S: StackState,
 {
+    pub fn to_state(self) -> StackFrame<'b, State> {
+        StackFrame {
+            stack: self.stack,
+            frame: unsafe { self.frame.to_state().unrooted() },
+        }
+    }
+
     fn offset(&self) -> VmIndex {
         self.frame.offset
     }
@@ -769,12 +776,20 @@ where
     where
         T: StackState,
     {
+        self.enter_scope_excess(args, state, false)
+    }
+
+    pub(crate) fn enter_scope_excess<T>(
+        self,
+        args: VmIndex,
+        state: &T,
+        excess: bool,
+    ) -> StackFrame<'b, T>
+    where
+        T: StackState,
+    {
         let stack = self.stack;
-        let frame = unsafe {
-            Self::add_new_frame(stack, args, T::to_state(state))
-                .from_state::<T>()
-                .clone_unrooted()
-        };
+        let frame = unsafe { Self::add_new_frame(stack, args, state, excess).unrooted() };
         StackFrame { stack, frame }
     }
 
@@ -813,17 +828,21 @@ where
         stack.current_frame()
     }
 
-    fn add_new_frame<'gc>(
+    fn add_new_frame<'gc, T>(
         stack: &mut Stack,
         args: VmIndex,
-        state: gc::Borrow<'gc, State>,
-    ) -> gc::Borrow<'gc, Frame> {
+        state: &'gc T,
+        excess: bool,
+    ) -> gc::Borrow<'gc, Frame<T>>
+    where
+        T: StackState,
+    {
         assert!(stack.len() >= args);
         let offset = stack.len() - args;
         let frame = construct_gc!(Frame {
             offset,
-            @state,
-            excess: false,
+            @state: gc::Borrow::new(state),
+            excess,
         });
         // Panic if the frame attempts to take ownership past the current frame
         if let Some(frame) = stack.frames.last() {
@@ -842,9 +861,9 @@ where
         // SAFETY The frame's gc pointers are scanned the `Stack::trace` since they are on
         // the stack
         unsafe {
-            stack.frames.push(frame.clone_unrooted());
+            stack.frames.push(frame.to_state().clone_unrooted());
         }
-        debug!("----> Store {} {:?}", stack.frames.len(), frame,);
+        debug!("----> Store {} {:?}", stack.frames.len(), frame.to_state());
         frame
     }
 }
