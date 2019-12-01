@@ -31,6 +31,7 @@ codespan = "0.3"
 codespan-reporting = "0.3"
 either = "1"
 vec_map = "0.8"
+typed-arena = "1"
 
 serde = { version = "1.0.0", features = ["rc"], optional = true }
 serde_state = { version = "0.4.0", features = ["rc"], optional = true }

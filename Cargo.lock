@@ -940,6 +940,7 @@ dependencies = [
  "serde_derive_state 0.4.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_state 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "smallvec 0.6.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "typed-arena 1.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "vec_map 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

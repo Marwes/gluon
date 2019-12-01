@@ -50,7 +50,7 @@ where
 /// MutVisitor that clears spans.
 pub struct ModifySpan<F>(F);
 
-impl<'a, F> MutVisitor<'a> for ModifySpan<F>
+impl<'a, F> MutVisitor<'a, '_> for ModifySpan<F>
 where
     F: FnMut(Span<BytePos>) -> Span<BytePos>,
 {
@@ -89,7 +89,7 @@ where
 pub fn parse_string<'env, 'input>(
     symbols: &'env mut dyn IdentEnv<Ident = String>,
     input: &'input str,
-) -> Result<SpannedExpr<String>, (Option<SpannedExpr<String>>, ParseErrors)> {
+) -> Result<SpannedExpr<'ast, String>, (Option<SpannedExpr<'ast, String>>, ParseErrors)> {
     parse_partial_expr(symbols, &TypeCache::default(), input)
 }
 
