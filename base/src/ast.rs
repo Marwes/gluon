@@ -20,9 +20,6 @@ use crate::types::{
 };
 use ordered_float::NotNan;
 
-pub type Arena<'ast, Id> = typed_arena::Arena<SpannedExpr<'ast, Id>>;
-pub type ArenaRef<'ast, Id> = &'ast Arena<'ast, Id>;
-
 pub trait DisplayEnv {
     type Ident;
 
@@ -1076,5 +1073,91 @@ pub fn expr_to_path(expr: &SpannedExpr<Symbol>, path: &mut String) -> Result<(),
             Ok(())
         }
         _ => Err("Expected a string literal or path to import"),
+    }
+}
+
+use std::mem;
+use std::sync::Arc;
+
+#[derive(Clone)]
+pub struct Arena<'ast, Id>(Arc<typed_arena::Arena<SpannedExpr<'ast, Id>>>);
+pub type ArenaRef<'ast, Id> = &'ast Arena<'ast, Id>;
+
+impl<'ast, Id> Deref for Arena<'ast, Id> {
+    type Target = typed_arena::Arena<SpannedExpr<'ast, Id>>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'ast, Id> Arena<'ast, Id> {
+    pub unsafe fn new(_: &'ast InvariantLifetime<'ast>) -> Self {
+        Arena(Arc::new(typed_arena::Arena::new()))
+    }
+}
+
+pub struct RootSpannedExpr<Id: 'static> {
+    // Only used to keep `expr` alive
+    #[allow(dead_code)]
+    arena: Arena<'static, Id>,
+    expr: *mut SpannedExpr<'static, Id>,
+}
+
+impl<Id> RootSpannedExpr<Id> {
+    pub fn new<'ast>(arena: Arena<'ast, Id>, expr: &'ast mut SpannedExpr<'ast, Id>) -> Self {
+        // TODO Verify 'ast is invariant
+        unsafe {
+            Self {
+                arena: mem::transmute::<Arena<Id>, Arena<Id>>(arena),
+                expr: mem::transmute::<*mut SpannedExpr<Id>, *mut SpannedExpr<Id>>(expr),
+            }
+        }
+    }
+
+    pub fn expr(&self) -> &SpannedExpr<'_, Id> {
+        unsafe { mem::transmute::<&SpannedExpr<Id>, &SpannedExpr<Id>>(&*self.expr) }
+    }
+
+    pub fn expr_mut(&mut self) -> &mut SpannedExpr<'_, Id> {
+        unsafe { mem::transmute::<&mut SpannedExpr<Id>, &mut SpannedExpr<Id>>(&mut *self.expr) }
+    }
+}
+
+#[doc(hidden)]
+#[derive(Default)]
+pub struct InvariantLifetime<'a>(std::marker::PhantomData<fn(&'a ()) -> &'a ()>);
+
+#[macro_export]
+macro_rules! mk_ast_arena {
+    ($name: ident) => {
+        let tag = $crate::ast::InvariantLifetime::default();
+        let $name = unsafe { $crate::ast::Arena::new(&tag) };
+        let _guard;
+        if false {
+            struct Guard<'tag>(&'tag $crate::ast::InvariantLifetime<'tag>);
+            impl<'tag> ::core::ops::Drop for Guard<'tag> {
+                fn drop(&mut self) {}
+            }
+            _guard = Guard(&tag);
+        }
+    };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn root_expr() {
+        mk_ast_arena!(arena1);
+        mk_ast_arena!(arena2);
+        let _: &Arena<String> = &arena1;
+
+        let arena2_expr = arena2.alloc(pos::spanned(
+            Default::default(),
+            Expr::<String>::Error(None),
+        ));
+
+        RootSpannedExpr::new(arena2.clone(), arena2_expr);
     }
 }

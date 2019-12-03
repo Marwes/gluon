@@ -393,7 +393,7 @@ pub fn binop<'ast>(
 
 #[test]
 fn take_implicits_into_account_on_infix_type() {
-    let arena = ast::Arena::new();
+    base::mk_ast_arena!(arena);
     let mut expr = binop(&arena, int(1), "+", int(2));
     if let Expr::Infix { ref mut op, .. } = expr.value {
         op.value.typ = Type::function_implicit(
