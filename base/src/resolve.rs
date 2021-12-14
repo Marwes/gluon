@@ -59,6 +59,7 @@ impl<T> AliasRemover<T> {
 impl<T> AliasRemover<T>
 where
     T: TypeExt<Id = Symbol, SpannedId = Symbol> + Clone + ::std::fmt::Display,
+    T::SpannedStringId: Clone,
     T::Types: Clone + Default + Extend<T> + FromIterator<T>,
     T::Generics: Clone + FromIterator<Generic<Symbol>>,
     T::Fields: Clone,
@@ -242,6 +243,7 @@ pub fn remove_aliases<T>(
 ) -> T
 where
     T: TypeExt<Id = Symbol, SpannedId = Symbol> + Clone + ::std::fmt::Display,
+    T::SpannedStringId: Clone,
     T::Types: Clone + Default + Extend<T> + FromIterator<T>,
     T::Generics: Clone + FromIterator<Generic<Symbol>>,
     T::Fields: Clone,
@@ -259,6 +261,7 @@ pub fn remove_aliases_cow<'t, T>(
 ) -> Cow<'t, T>
 where
     T: TypeExt<Id = Symbol, SpannedId = Symbol> + Clone + ::std::fmt::Display,
+    T::SpannedStringId: Clone,
     T::Types: Clone + Default + Extend<T> + FromIterator<T>,
     T::Generics: Clone + FromIterator<Generic<Symbol>>,
     T::Fields: Clone,
@@ -280,6 +283,7 @@ pub fn canonical_alias<'t, F, T>(
 where
     F: FnMut(&AliasRef<Symbol, T>) -> bool,
     T: TypeExt<Id = Symbol, SpannedId = Symbol> + Clone + ::std::fmt::Display,
+    T::SpannedStringId: Clone,
     T::Types: Clone + Default + Extend<T> + FromIterator<T>,
     T::Generics: Clone + FromIterator<Generic<Symbol>>,
     T::Fields: Clone,
@@ -316,6 +320,7 @@ pub fn remove_alias<T>(
 ) -> Result<Option<T>, Error>
 where
     T: TypeExt<Id = Symbol, SpannedId = Symbol> + Clone + ::std::fmt::Display,
+    T::SpannedStringId: Clone,
     T::Types: Clone + Default + Extend<T> + FromIterator<T>,
     T::Generics: Clone + FromIterator<Generic<Symbol>>,
     T::Fields: Clone,

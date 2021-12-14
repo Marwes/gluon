@@ -131,7 +131,9 @@ impl<Id> HasSpan for AstType<'_, Id> {
 
 impl<'ast, Id> TypePtr for AstType<'ast, Id> {
     type Id = Id;
+    type StringId = Id;
     type SpannedId = Spanned<Id, BytePos>;
+    type SpannedStringId = Spanned<Id, BytePos>;
     type Types = &'ast mut [AstType<'ast, Id>];
     type Generics = &'ast mut [Generic<Id>];
     type Fields = &'ast mut [Field<Self::SpannedId, Self>];

@@ -1030,8 +1030,8 @@ pub enum Type<Id, T: TypePtr<Id = Id> = ArcType<Id>> {
     Skolem(#[cfg_attr(feature = "serde_derive", serde(state))] Skolem<Id>),
 }
 
-pub type TypeField<T> = Field<<T as TypePtr>::SpannedId, Alias<<T as TypePtr>::Id, T>>;
-pub type ValueField<T> = Field<<T as TypePtr>::SpannedId, T>;
+pub type TypeField<T> = Field<<T as TypePtr>::SpannedStringId, Alias<<T as TypePtr>::Id, T>>;
+pub type ValueField<T> = Field<<T as TypePtr>::SpannedStringId, T>;
 
 impl<Id, T> Default for Type<Id, T>
 where

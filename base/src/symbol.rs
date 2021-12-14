@@ -16,6 +16,7 @@ use crate::{
 
 pub type Label = StringEq<Symbol>;
 
+#[derive(Clone)]
 pub struct StringEq<T>(T);
 
 impl<T: AsRef<str>> AsRef<str> for StringEq<T> {
@@ -24,13 +25,13 @@ impl<T: AsRef<str>> AsRef<str> for StringEq<T> {
     }
 }
 
-impl<T: AsRef<str>> fmt::Debug for StringEq<T> {
+impl<T: fmt::Debug> fmt::Debug for StringEq<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.0.fmt(f)
     }
 }
 
-impl<T: AsRef<str>> fmt::Display for StringEq<T> {
+impl<T: fmt::Display> fmt::Display for StringEq<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.0.fmt(f)
     }

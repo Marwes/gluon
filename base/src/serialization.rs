@@ -10,7 +10,7 @@ use crate::serde::de::{DeserializeSeed, DeserializeState, Deserializer, Error};
 use crate::serde::ser::{SerializeState, Serializer};
 
 use crate::kind::ArcKind;
-use crate::symbol::Symbol;
+use crate::symbol::{StringEq, Symbol};
 use crate::types::{AliasData, ArcType, Generic, Type, TypeExt, TypePtr};
 
 #[derive(Default)]
@@ -338,6 +338,7 @@ pub mod seq {
 impl<Id> SerializeState<SeSeed> for ArcType<Id>
 where
     Id: SerializeState<SeSeed> + PartialEq,
+    StringEq<Id>: SerializeState<SeSeed> + PartialEq,
 {
     fn serialize_state<S>(&self, serializer: S, seed: &SeSeed) -> Result<S::Ok, S::Error>
     where
