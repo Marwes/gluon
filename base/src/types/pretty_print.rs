@@ -81,7 +81,7 @@ where
 {
     width: usize,
     typ: &'a T,
-    filter: &'a dyn Fn(&I) -> Filter,
+    filter: &'a dyn Fn(&str) -> Filter,
     symbol_text: &'a dyn Fn(&I) -> &str,
     annotate_symbol: &'a dyn Fn(&I) -> Option<A>,
     _marker: PhantomData<I>,
@@ -109,7 +109,7 @@ impl<'a, I, T, A> TypeFormatter<'a, I, T, A> {
         self
     }
 
-    pub fn filter(mut self, filter: &'a dyn Fn(&I) -> Filter) -> Self {
+    pub fn filter(mut self, filter: &'a dyn Fn(&str) -> Filter) -> Self {
         self.filter = filter;
         self
     }
@@ -195,7 +195,7 @@ impl<'a, I, A> Printer<'a, I, A> {
         }
     }
 
-    pub fn filter(&self, field: &I) -> Filter {
+    pub fn filter(&self, field: &str) -> Filter {
         (self.filter)(field)
     }
 

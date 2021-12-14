@@ -14,6 +14,54 @@ use crate::{
     pos::{BytePos, Span},
 };
 
+pub type Label = StringEq<Symbol>;
+
+pub struct StringEq<T>(T);
+
+impl<T: AsRef<str>> AsRef<str> for StringEq<T> {
+    fn as_ref(&self) -> &str {
+        self.0.as_ref()
+    }
+}
+
+impl<T: AsRef<str>> fmt::Debug for StringEq<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl<T: AsRef<str>> fmt::Display for StringEq<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl<T: AsRef<str>> Eq for StringEq<T> {}
+
+impl<T: AsRef<str>> PartialEq for StringEq<T> {
+    fn eq(&self, other: &StringEq<T>) -> bool {
+        self.0.as_ref() == other.0.as_ref()
+    }
+}
+
+impl<T: AsRef<str>> PartialOrd for StringEq<T> {
+    fn partial_cmp(&self, other: &StringEq<T>) -> Option<Ordering> {
+        self.0.as_ref().partial_cmp(other.0.as_ref())
+    }
+}
+
+impl<T: AsRef<str>> Ord for StringEq<T> {
+    fn cmp(&self, other: &StringEq<T>) -> Ordering {
+        self.0.as_ref().cmp(other.0.as_ref())
+    }
+}
+
+impl<T: AsRef<str>> Hash for StringEq<T> {
+    fn hash<H: Hasher>(&self, h: &mut H) {
+        self.0.as_ref().hash(h)
+    }
+}
+
 // FIXME Don't have a double indirection (Arc + String)
 /// A symbol uniquely identifies something regardless of its name and which module it originated
 /// from
