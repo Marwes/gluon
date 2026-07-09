@@ -1,6 +1,6 @@
 [package]
 name = "gluon"
-version = "0.18.3"                             # GLUON
+version = "0.18.4"                             # GLUON
 authors = ["Markus <marwes91@gmail.com>"]
 keywords = ["script", "scripting", "language"]
 build = "build.rs"
@@ -24,13 +24,13 @@ name = "gluon"
 path = "src/lib.rs"
 
 [dependencies]
-gluon_base = { path = "base", version = "0.18.3" }                                                        # GLUON
-gluon_check = { path = "check", version = "0.18.3" }                                                      # GLUON
-gluon_parser = { path = "parser", version = "0.18.3" }                                                    # GLUON
-gluon_codegen = { path = "codegen", version = "0.18.3" }                                                  # GLUON
-gluon_vm = { path = "vm", version = "0.18.3", default-features = false }                                  # GLUON
-gluon_format = { path = "format", version = "0.18.3", default-features = false }                          # GLUON
-gluon_completion = { path = "completion", version = "0.18.3", default-features = false, optional = true } # GLUON
+gluon_base = { path = "base", version = "0.18.4" }                                                        # GLUON
+gluon_check = { path = "check", version = "0.18.4" }                                                      # GLUON
+gluon_parser = { path = "parser", version = "0.18.4" }                                                    # GLUON
+gluon_codegen = { path = "codegen", version = "0.18.4" }                                                  # GLUON
+gluon_vm = { path = "vm", version = "0.18.4", default-features = false }                                  # GLUON
+gluon_format = { path = "format", version = "0.18.4", default-features = false }                          # GLUON
+gluon_completion = { path = "completion", version = "0.18.4", default-features = false, optional = true } # GLUON
 
 async-trait = "0.1.73"
 log = "0.4.20"
@@ -79,7 +79,7 @@ rand = { version = "0.10", optional = true }
 rand_xorshift = { version = "0.5", optional = true }
 
 [build-dependencies]
-gluon_base = { path = "base", version = "0.18.3" } # GLUON
+gluon_base = { path = "base", version = "0.18.4" } # GLUON
 
 itertools.workspace = true
 little-skeptic = { version = "0.15.2", optional = true }
@@ -108,8 +108,8 @@ bincode = "2.0.0"
 
 pulldown-cmark = "0.13.4"
 
-gluon_completion = { path = "completion", version = "0.18.3" } # GLUON
-gluon_codegen = { path = "codegen", version = "0.18.3" }       # GLUON
+gluon_completion = { path = "completion", version = "0.18.4" } # GLUON
+gluon_codegen = { path = "codegen", version = "0.18.4" }       # GLUON
 
 [workspace.dependencies]
 env_logger = "0.11"
@@ -126,7 +126,7 @@ lalrpop-util = "0.23.1"
 [features]
 default = ["async", "regex", "random"]
 async = ["tokio"]
-random = ["rand", "rand_xorshift"]
+random = ["dep:rand", "dep:rand_xorshift"]
 serialization = [
     "serde",
     "serde_state",
@@ -135,23 +135,23 @@ serialization = [
 ]
 web = [
     "async",
-    "hyper",
-    "hyper-util",
-    "http-body-util",
+    "dep:hyper",
+    "dep:hyper-util",
+    "dep:http-body-util",
     "http",
-    "tower-service",
+    "dep:tower-service",
     "tokio/net",
-    "tokio-stream",
-    "pin-project-lite",
+    "dep:tokio-stream",
+    "dep:pin-project-lite",
 ]
-web-tls = ["tokio/fs", "native-tls", "tokio-native-tls"]
+web-tls = ["tokio/fs", "dep:native-tls", "dep:tokio-native-tls"]
 
 gluon_completion = ["dep:gluon_completion", "gluon_vm/gluon_completion"]
 
 docs_rs = ["serialization"]
 
-test = ["serialization", "little-skeptic", "http", "web", "gluon_vm/test"]
-nightly = ["compiletest_rs", "gluon_base/nightly"]
+test = ["serialization", "dep:little-skeptic", "http", "web", "gluon_vm/test"]
+nightly = ["dep:compiletest_rs", "gluon_base/nightly"]
 test_nightly = ["test", "nightly"]
 
 [[bench]]

@@ -1,3 +1,15 @@
+## [0.18.4](https://github.com/gluon-lang/gluon/compare/v0.18.3..0.18.4) - 2026-08-03
+
+### Bug Fixes
+
+- Don't cascade errors if a module (or variable) is undefined - ([d7df0aa](https://github.com/gluon-lang/gluon/commit/d7df0aaf5f12652196ec1c52449d4d528f66d977)) - Markus Westerlind
+
+## [0.18.4](https://github.com/gluon-lang/gluon/compare/v0.18.3..0.18.4) - 2026-08-03
+
+### Bug Fixes
+
+- Don't cascade errors if a module (or variable) is undefined - ([d7df0aa](https://github.com/gluon-lang/gluon/commit/d7df0aaf5f12652196ec1c52449d4d528f66d977)) - Markus Westerlind
+
 ## [0.18.3](https://github.com/gluon-lang/gluon/compare/v0.18.2..0.18.3) - 2026-07-08
 
 ### Bug Fixes
