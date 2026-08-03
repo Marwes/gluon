@@ -10,7 +10,13 @@ fn lib_dir(out_dir: &Path, lib_name: &str, extension: &str) -> PathBuf {
     // flags which gives ambiguity errors.
     // Instead retrieve the latest compiled gluon library which should usually be the correct one
     let mut gluon_rlibs: Vec<_> = fs::read_dir(out_dir.join("deps"))
-        .unwrap()
+        .unwrap_or_else(|err| {
+            panic!(
+                "Failed to read dir {}: {}",
+                out_dir.join("deps").display(),
+                err
+            )
+        })
         .filter_map(|entry| {
             let entry = entry.expect("dir entry");
             if entry

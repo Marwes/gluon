@@ -1,4 +1,4 @@
-#![cfg(feature = "rand")]
+#![cfg(feature = "random")]
 
 use std::{fs::File, io::Read};
 
