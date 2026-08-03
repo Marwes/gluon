@@ -685,6 +685,9 @@ async fn import(
 ) -> SalvageResult<TypedIdent<Symbol>, Error> {
     assert!(!modulename.starts_with('@'));
     let thread = db.thread().root_thread();
+    if modulename.contains("std.effect") {
+        dbg!(&modulename);
+    }
 
     let name = Symbol::from(format!("@{}", modulename));
     let result = crate::get_import(&thread)
@@ -775,8 +778,12 @@ async fn extern_module(
     name: String,
 ) -> Result<UnrootedGlobal> {
     let id = Symbol::from(format!("@{}", name));
-    let loader = db.extern_loader(name);
+    dbg!(&name);
+    let loader = db.extern_loader(name.clone());
 
+    if name == "std.http.prim" {
+        dbg!(&loader.dependencies);
+    }
     for dep in &loader.dependencies {
         db.import(dep.clone()).await?;
     }

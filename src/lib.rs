@@ -1053,7 +1053,7 @@ impl VmBuilder {
         add_extern_module_if!(
             #[cfg(feature = "web")],
             available_if = "gluon is compiled with the 'web' feature",
-            dependencies = ["std.http.types"],
+            dependencies = ["std.http.types", "std.effect"],
             args(&vm, "std.http.prim", crate::std_lib::http::load)
         );
 

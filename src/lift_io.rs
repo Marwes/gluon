@@ -30,13 +30,13 @@ impl Macro for LiftIo {
         args: &'b mut [SpannedExpr<'ast, Symbol>],
     ) -> MacroFuture<'r, 'ast> {
         Box::pin(async move {
-            if args.len() != 2 {
+            let [lift, module] = args else {
                 return Err(macros::Error::message(format!(
                     "`lift_io!` expects 2 argument"
                 )));
-            }
+            };
 
-            let lift = match &args[0].value {
+            let lift = match &lift.value {
                 Expr::Ident(id) => id.clone(),
                 _ => {
                     return Err(macros::Error::message(format!(
@@ -45,7 +45,6 @@ impl Macro for LiftIo {
                 }
             };
 
-            let module = &mut args[1];
             env.run_once(&mut Symbols::new(), arena, module).await;
 
             let typ = module.env_type_of(&EmptyEnv::default());
