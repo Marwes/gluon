@@ -1,4 +1,5 @@
 extern crate gluon_base;
+//@no-rustfix
 
 use gluon_base::{
     ast::{Arena, Expr, RootExpr},
@@ -8,7 +9,8 @@ use gluon_base::{
 fn main() {
     mk_ast_arena!(arena1);
     mk_ast_arena!(arena2);
-    //~^ temporary value dropped while borrowed [E0716]
+    //~^ E0716
+    // temporary value dropped while borrowed
 
     let arena1_expr = arena1.alloc(pos::spanned(
         Default::default(),

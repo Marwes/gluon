@@ -1,0 +1,14 @@
+[package]
+name = "compile-fail"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[lib]
+path = "compile_fail_lib.in"
+
+[dependencies]
+gluon = { path = "../.." }
+gluon_vm = { path = "../../vm" }
+gluon_codegen = { path = "../../codegen" }

@@ -1,10 +1,12 @@
+//@normalize-stderr-test: "(/|\w:)[^ ]*/src/lib.rs" -> "../src/lib.rs"
+//@normalize-stderr-test: "(/|\w:)[^ ]*/mod.rs" -> "../mod.rs"
 extern crate gluon;
 
-use gluon::{new_vm, ThreadExt};
+use gluon::{ThreadExt, new_vm};
 
 fn main() {
     let vm = new_vm();
 
     let _ = vm.run_expr::<&str>("", r#" "test" "#);
-    //~^ the trait bound `for<'value> &str: Getable<'_, 'value>` is not satisfied [E0277]
+    //~^ ERROR: the trait bound `for<'value> &str: Getable<'_, 'value>` is not satisfied
 }

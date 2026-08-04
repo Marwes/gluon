@@ -1,0 +1,26 @@
+error[E0277]: the trait bound `for<'value> &str: Getable<'_, 'value>` is not satisfied
+   --> tests/compile-fail/run_expr_str_ref.rs:10:27
+    |
+ 10 |     let _ = vm.run_expr::<&str>("", r#" "test" "#);
+    |                --------   ^^^^ the trait `for<'value> Getable<'_, 'value>` is not implemented for `&str`
+    |                |
+    |                required by a bound introduced by this call
+    |
+help: the trait `Getable<'_, 'value>` is not implemented for `&str`
+      but trait `Getable<'_, '_>` is implemented for it
+   --> ../mod.rs:746:1
+    |
+746 | impl<'vm, 'value> Getable<'vm, 'value> for &'value str {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: required by a bound in `gluon::ThreadExt::run_expr`
+   --> ../src/lib.rs:705:12
+    |
+703 |     fn run_expr<'vm, T>(&'vm self, name: &str, expr_str: &str) -> Result<(T, ArcType)>
+    |        -------- required by a bound in this associated function
+704 |     where
+705 |         T: for<'value> Getable<'vm, 'value> + VmType + Send + 'vm,
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `ThreadExt::run_expr`
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0277`.

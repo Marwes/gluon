@@ -72,7 +72,7 @@ native-tls = { version = "0.2.11", optional = true }
 tokio-native-tls = { version = "0.3.1", optional = true }
 
 # Crates used in testing
-compiletest_rs = { version = "0.11", optional = true }
+ui_test = { version = "0.30", optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 rand = { version = "0.10", optional = true }
@@ -151,7 +151,7 @@ gluon_completion = ["dep:gluon_completion", "gluon_vm/gluon_completion"]
 docs_rs = ["serialization"]
 
 test = ["serialization", "dep:little-skeptic", "http", "web", "gluon_vm/test"]
-nightly = ["dep:compiletest_rs", "gluon_base/nightly"]
+nightly = ["dep:ui_test", "gluon_base/nightly"]
 test_nightly = ["test", "nightly"]
 
 [[bench]]
@@ -170,6 +170,11 @@ harness = false
 name = "main"
 harness = false
 required-features = ["serialization"]
+
+[[test]]
+name = "compiletest"
+harness = false
+required-features = ["nightly"]
 
 [[example]]
 name = "marshalling"

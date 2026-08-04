@@ -482,7 +482,7 @@ async fn main_(options: &Opt) -> Result<(), Error> {
         &tensile::Options::default().filter(filter.map_or("", |s| &s[..])),
     )
     .await?;
-    if !report.passes() {
+    if report.failed_tests > 0 {
         return Err("Some tests failed".into());
     }
     Ok(())

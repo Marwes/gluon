@@ -2,6 +2,7 @@
 extern crate gluon_vm;
 extern crate gluon;
 extern crate gluon_codegen;
+//@no-rustfix
 
 use std::{fmt, sync::Mutex};
 
@@ -41,6 +42,6 @@ fn main() {
     let vm = new_vm();
     add_extern_module(&vm, "test", |vm| {
         ExternModule::new(vm, primitive!(2, f))
-        //~^ borrowed data escapes outside of function [E0521]
+        //~^ ERROR: borrowed data escapes outside of function
     });
 }

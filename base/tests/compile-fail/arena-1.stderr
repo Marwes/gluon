@@ -1,0 +1,26 @@
+warning: unused import: `Arena`
+ --> tests/compile-fail/arena-1.rs:5:11
+  |
+5 |     ast::{Arena, Expr, RootExpr},
+  |           ^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0716]: temporary value dropped while borrowed
+  --> tests/compile-fail/arena-1.rs:11:5
+   |
+11 |     mk_ast_arena!(arena2);
+   |     ^^^^^^^^^^^^^^^^^^^^^ creates a temporary value which is freed while still in use
+...
+21 | }
+   | -
+   | |
+   | temporary value is freed at the end of this statement
+   | borrow might be used here, when `_guard` is dropped and runs the `Drop` code for type `main::Guard`
+   |
+   = note: consider using a `let` binding to create a longer lived value
+   = note: this error originates in the macro `mk_ast_arena` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: aborting due to 1 previous error; 1 warning emitted
+
+For more information about this error, try `rustc --explain E0716`.

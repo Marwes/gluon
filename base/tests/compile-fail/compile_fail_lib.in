@@ -1,0 +1,1 @@
+// Helper crate used by ui compile-fail tests for dependency resolution.

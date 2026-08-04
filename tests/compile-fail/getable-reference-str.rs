@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate gluon_vm;
 extern crate gluon;
+//@no-rustfix
 use gluon::{
     import::add_extern_module,
     new_vm,
@@ -18,6 +19,6 @@ fn main() {
     let vm = new_vm();
     add_extern_module(&vm, "test", |vm| {
         ExternModule::new(vm, primitive!(1, f))
-        //~^ lifetime may not live long enough
+        //~^ ERROR: lifetime may not live long enough
     });
 }
