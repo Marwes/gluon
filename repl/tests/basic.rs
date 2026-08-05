@@ -1,18 +1,11 @@
 #[macro_use]
 extern crate pretty_assertions;
 
-use std::env;
-use std::path::Path;
 use std::process::{Command, Stdio};
 
 #[test]
 fn issue_365_run_io_from_command_line() {
-    let path = env::args().next().unwrap();
-    let gluon_path = Path::new(&path[..])
-        .parent()
-        .and_then(|p| p.parent())
-        .expect("folder")
-        .join("gluon");
+    let gluon_path = std::env::var("CARGO_BIN_EXE_gluon").unwrap();
     let output = Command::new(&*gluon_path)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -20,7 +13,7 @@ fn issue_365_run_io_from_command_line() {
         .env("GLUON_PATH", "..")
         .arg("tests/print.glu")
         .output()
-        .unwrap_or_else(|err| panic!("{}\nWhen opening `{}`", err, gluon_path.display()));
+        .unwrap_or_else(|err| panic!("{}\nWhen opening `{}`", err, gluon_path));
 
     let stderr = String::from_utf8_lossy(&output.stderr);
     if stderr != "" {
