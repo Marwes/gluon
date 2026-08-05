@@ -1,3 +1,4 @@
+//@normalize-stderr-test: "[^ ]*?[\\/]([^\\/]+).rs" -> ".../$1.rs"
 #[macro_use]
 extern crate gluon_vm;
 extern crate gluon;
@@ -10,10 +11,8 @@ use gluon::{
     import::add_extern_module,
     new_vm,
     vm::{
-        api::{primitive_f, Userdata, VmType},
-        gc::Trace,
-        thread::{Status, Thread},
         ExternModule,
+        api::{Userdata, VmType},
     },
 };
 

@@ -1,3 +1,4 @@
+//@normalize-stderr-test: "[^ ]*?[\\/]([^\\/]+).rs" -> ".../$1.rs"
 use gluon::new_vm;
 use gluon::vm::Variants;
 use gluon::vm::api::Getable;

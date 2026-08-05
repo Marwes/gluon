@@ -1,19 +1,7 @@
-warning: unused imports: `Status`, `Thread`, `gc::Trace`, and `primitive_f`
-  --> tests/compile-fail/store-ref.rs:13:15
-   |
-13 |         api::{primitive_f, Userdata, VmType},
-   |               ^^^^^^^^^^^
-14 |         gc::Trace,
-   |         ^^^^^^^^^
-15 |         thread::{Status, Thread},
-   |                  ^^^^^^  ^^^^^^
-   |
-   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
-
 error[E0521]: borrowed data escapes outside of function
-  --> tests/compile-fail/store-ref.rs:44:31
+  --> .../store-ref.rs:43:31
    |
-44 |         ExternModule::new(vm, primitive!(2, f))
+43 |         ExternModule::new(vm, primitive!(2, f))
    |                               ^^^^^^^^^^^^^^^^
    |                               |
    |                               `thread` is a reference that is only valid in the function body
@@ -21,11 +9,11 @@ error[E0521]: borrowed data escapes outside of function
    |                               lifetime `'thread` defined here
    |                               argument requires that `'thread` must outlive `'static`
    |
-   = note: requirement occurs because of the type `Test<'_>`, which makes the generic argument `'_` invariant
+   = note: requirement occ.rs because of the type `Test<'_>`, which makes the generic argument `'_` invariant
    = note: the struct `Test<'vm>` is invariant over the parameter `'vm`
    = help: see <https://doc.rust-lang.org/nomicon/subtyping.html> for more information about variance
    = note: this error originates in the macro `primitive` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error: aborting due to 1 previous error; 1 warning emitted
+error: aborting due to 1 previous error
 
 For more information about this error, try `rustc --explain E0521`.

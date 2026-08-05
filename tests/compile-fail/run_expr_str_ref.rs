@@ -1,5 +1,4 @@
-//@normalize-stderr-test: "(/|\w:)[^ ]*/src/lib.rs" -> "../src/lib.rs"
-//@normalize-stderr-test: "(/|\w:)[^ ]*/mod.rs" -> "../mod.rs"
+//@normalize-stderr-test: "[^ ]*?[\\/]([^\\/]+)\.rs" -> ".../$1.rs"
 extern crate gluon;
 
 use gluon::{ThreadExt, new_vm};

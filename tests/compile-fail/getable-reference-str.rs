@@ -1,16 +1,9 @@
+//@normalize-stderr-test: "[^ ]*?[\\/]([^\\/]+).rs" -> ".../$1.rs"
 #[macro_use]
 extern crate gluon_vm;
 extern crate gluon;
 //@no-rustfix
-use gluon::{
-    import::add_extern_module,
-    new_vm,
-    vm::{
-        api::primitive_f,
-        thread::{Status, Thread},
-        ExternModule,
-    },
-};
+use gluon::{import::add_extern_module, new_vm, vm::ExternModule};
 
 fn f(_: &'static str) {}
 

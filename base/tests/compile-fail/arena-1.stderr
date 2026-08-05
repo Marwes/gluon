@@ -1,18 +1,18 @@
 warning: unused import: `Arena`
- --> tests/compile-fail/arena-1.rs:5:11
+ --> .../arena-1.rs:6:11
   |
-5 |     ast::{Arena, Expr, RootExpr},
+6 |     ast::{Arena, Expr, RootExpr},
   |           ^^^^^
   |
   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
 
 error[E0716]: temporary value dropped while borrowed
-  --> tests/compile-fail/arena-1.rs:11:5
+  --> .../arena-1.rs:12:5
    |
-11 |     mk_ast_arena!(arena2);
+12 |     mk_ast_arena!(arena2);
    |     ^^^^^^^^^^^^^^^^^^^^^ creates a temporary value which is freed while still in use
 ...
-21 | }
+22 | }
    | -
    | |
    | temporary value is freed at the end of this statement

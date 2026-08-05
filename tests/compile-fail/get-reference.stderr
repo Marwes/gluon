@@ -1,13 +1,13 @@
 error[E0597]: `value` does not live long enough
-  --> tests/compile-fail/get-reference.rs:10:31
+  --> .../get-reference.rs:11:31
    |
- 9 |     let value = Value::int(0);
+10 |     let value = Value::int(0);
    |         ----- binding `value` declared here
-10 |     let value = Variants::new(&value);
+11 |     let value = Variants::new(&value);
    |                               ^^^^^^ borrowed value does not live long enough
-11 |     let _: &'static str = <&'static str>::from_value(&vm, value);
+12 |     let _: &'static str = <&'static str>::from_value(&vm, value);
    |                           -------------------------------------- argument requires that `value` is borrowed for `'static`
-12 | }
+13 | }
    | - `value` dropped here while still borrowed
 
 error: aborting due to 1 previous error

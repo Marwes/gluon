@@ -1,3 +1,4 @@
+//@normalize-stderr-test: "[^ ]*?[\\/]([^\\/]+).rs" -> ".../$1.rs"
 extern crate gluon_base;
 //@no-rustfix
 
